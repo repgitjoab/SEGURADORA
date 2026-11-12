@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendências Seguradoras – Portais</title>
+<style>
+:root{
+  --page:#f9f9f7; --surface:#fcfcfb; --card:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10); --accent:#2a78d6; --accent-wash:rgba(42,120,214,.08);
+  --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b; --neutral:#898781; --info:#2a78d6;
+  --good-ink:#006300;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --page:#0d0d0d; --surface:#1a1a19; --card:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --accent:#3987e5; --accent-wash:rgba(57,135,229,.14); --good-ink:#0ca30c; --info:#3987e5;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--grid);background:var(--surface);position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;font-weight:650}
+header .meta{color:var(--muted);font-size:12px}
+header .sp{flex:1}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select,input[type=search],button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--axis);border-radius:8px;padding:6px 10px}
+input[type=search]{width:240px}
+button{cursor:pointer}
+button:hover{background:var(--accent-wash)}
+button.prim{background:var(--accent);border-color:var(--accent);color:#fff}
+main{padding:20px 24px 60px;max-width:1500px;margin:0 auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--ring);border-radius:12px;padding:14px 16px}
+.kpi .l{color:var(--ink2);font-size:12px}
+.kpi .v{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{color:var(--muted);font-size:12px}
+h2{font-size:14px;font-weight:650;margin:22px 0 10px;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{position:relative;background:var(--card);border:1px solid var(--ring);border-radius:12px;padding:14px 16px 14px 20px;cursor:pointer;transition:transform .08s,box-shadow .08s;overflow:hidden}
+.card:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.card.ativo{outline:2px solid var(--accent)}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
+.card .t{display:flex;align-items:center;gap:8px;font-weight:600}
+.ico{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--c);color:#fff;font-size:12px;font-weight:700;flex:none}
+.ico.dk{color:#0b0b0b}
+.card .n{font-size:28px;font-weight:650;margin-top:6px;font-variant-numeric:tabular-nums}
+.card .r{color:var(--ink2);font-variant-numeric:tabular-nums}
+.card .d{color:var(--muted);font-size:12px;margin-top:4px}
+.card.vazio{opacity:.55}
+.dois{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+@media (max-width:1000px){.dois{grid-template-columns:1fr}}
+.painel{background:var(--card);border:1px solid var(--ring);border-radius:12px;padding:14px 16px}
+.barra{display:grid;grid-template-columns:200px 1fr 110px;align-items:center;gap:10px;padding:4px 0;cursor:pointer;border-radius:6px}
+.barra:hover{background:var(--accent-wash)}
+.barra .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+.barra .tr{height:14px;background:transparent;position:relative}
+.barra .fl{height:14px;background:var(--accent);border-radius:0 4px 4px 0}
+.barra .vl{text-align:right;font-variant-numeric:tabular-nums}
+button.mini{font-size:12px;padding:3px 8px;border-radius:6px}
+.card .x{position:absolute;top:10px;right:10px}
+table.vend td,table.vend th{padding:6px 8px}
+table.vend td.c{text-align:center;cursor:pointer;font-variant-numeric:tabular-nums}
+table.vend td.c:hover{background:var(--accent-wash)}
+table.vend td.z{color:var(--muted)}
+table.vend tr.on td{background:var(--accent-wash)}
+.grupos{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;align-items:start}
+@media (min-width:800px){.grupo.largo{grid-column:span 2}}
+.grupo{position:relative;background:var(--card);border:1px solid var(--ring);border-radius:12px;padding:12px 14px 10px 18px;overflow:hidden}
+.grupo::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
+.grupo.ativo{outline:2px solid var(--accent)}
+.grupo.vazio{opacity:.55}
+.grupo .gh{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.grupo .gt{flex:1;display:flex;flex-direction:column;gap:2px}
+.grupo .gt b{font-size:15px}
+.grupo .gt .muted{font-size:12px}
+.grupo .gn{margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.grupo .gn .n{font-size:28px;font-weight:650}
+.grupo .gn .r{float:right;margin-top:12px;color:var(--ink2);font-weight:600}
+.subs{border-top:1px solid var(--grid);margin-top:6px}
+.sub{display:grid;grid-template-columns:10px 1fr auto 110px 30px;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--grid);cursor:pointer;font-size:13px;border-radius:6px}
+.sub:last-child{border-bottom:0}
+.sub:hover,.sub.ativo{background:var(--accent-wash)}
+.sub.ativo{font-weight:600}
+.sub.z{opacity:.5}
+.sub i{width:10px;height:10px;border-radius:50%}
+.sub b{font-variant-numeric:tabular-nums;min-width:26px;text-align:right}
+.sub .r{text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums}
+.sub .mini{padding:1px 6px}
+.subsep{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink2);padding:10px 4px 4px}
+.vtop{display:flex;align-items:center;gap:12px;margin:4px 0 16px;flex-wrap:wrap}
+.caso{position:relative;background:var(--card);border:1px solid var(--ring);border-radius:12px;padding:12px 16px 12px 20px;margin-bottom:12px;transition:box-shadow .3s}
+.caso::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c);border-radius:12px 0 0 12px}
+.caso.ok{box-shadow:0 0 0 3px var(--good)}
+.caso .ch{display:flex;justify-content:space-between;gap:12px}
+.caso .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
+.caso .mots{margin:6px 0;padding-left:18px;color:var(--ink2);font-size:13px}
+.caso .ultresp{background:var(--accent-wash);border-radius:8px;padding:6px 10px;font-size:13px;margin:6px 0}
+.form{display:grid;grid-template-columns:2fr 1fr;gap:8px 12px;border-top:1px dashed var(--grid);padding-top:10px;margin-top:8px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink2)}
+.form .full{grid-column:1/-1}
+.form select,.form input,.form textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--page);border:1px solid var(--axis);border-radius:8px;padding:6px 8px}
+.form .linha{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.form .linha .sp{flex:1}
+.form .rd{flex-direction:row;align-items:center;gap:6px;font-size:14px;color:var(--ink)}
+@media (max-width:700px){.form{grid-template-columns:1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--axis);border-radius:999px;padding:4px 10px;cursor:pointer;font-size:13px;background:var(--card)}
+.chip b{font-variant-numeric:tabular-nums}
+.chip:hover,.chip.ativo{background:var(--accent-wash);border-color:var(--accent)}
+.tabwrap{background:var(--card);border:1px solid var(--ring);border-radius:12px;overflow:auto;max-height:70vh}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid var(--grid);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);font-size:12px;color:var(--ink2);cursor:pointer;user-select:none;z-index:1}
+th.num,td.num{text-align:right}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--accent-wash)}
+td.mot{white-space:normal;min-width:280px;max-width:460px;color:var(--ink2);font-size:13px}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--ring);white-space:nowrap}
+.tag i{width:8px;height:8px;border-radius:50%;background:var(--c);display:inline-block}
+.listahdr{display:flex;align-items:center;gap:10px;margin:22px 0 10px;flex-wrap:wrap}
+.listahdr h2{margin:0}
+.listahdr .sp{flex:1}
+.muted{color:var(--muted)}
+.vermelho{color:var(--critical)}
+/* drawer */
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
+#dw{position:fixed;top:0;right:0;bottom:0;width:min(980px,96vw);background:var(--page);z-index:21;transform:translateX(100%);transition:transform .18s;overflow:auto;box-shadow:-8px 0 30px rgba(0,0,0,.2)}
+#dw.on{transform:none} #ov.on{display:block}
+#dw .top{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--grid);padding:14px 20px;display:flex;align-items:center;gap:12px}
+#dw .top h3{margin:0;font-size:17px}
+#dw .bd{padding:16px 20px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.campo{background:var(--card);border:1px solid var(--ring);border-radius:10px;padding:8px 12px}
+.campo .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.campo .v{font-weight:600;font-variant-numeric:tabular-nums;word-break:break-word}
+.alerta{border-radius:10px;padding:10px 14px;margin-bottom:14px;border:1px solid var(--ring);background:var(--card);border-left:5px solid var(--c)}
+.alerta li{margin:3px 0}
+.hist{background:var(--card);border:1px solid var(--ring);border-radius:10px;padding:8px 12px;margin-bottom:14px}
+.hist div{padding:3px 0;border-bottom:1px dashed var(--grid);font-size:13px}
+.hist div:last-child{border:0}
+pre{white-space:pre-wrap;font-size:12px;background:var(--card);border:1px solid var(--ring);border-radius:10px;padding:10px;max-height:220px;overflow:auto}
+.vazio-msg{padding:40px;text-align:center;color:var(--muted)}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--page);padding:6px 10px;border-radius:6px;font-size:12px;display:none;z-index:30;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header>
+  <h1>Pendências de Seguradora · Portais</h1>
+  <span class="meta" id="meta">—</span>
+  <span class="sp"></span>
+  <div class="filtros">
+    <select id="fPortal"><option value="">Todos os portais</option></select>
+    <select id="fSeg"><option value="">Todas as seguradoras</option></select>
+    <select id="fVend"><option value="">Todos os vendedores</option></select>
+    <input type="search" id="fBusca" placeholder="NF, pedido, sinistro ou placa">
+    <button id="btnArq" title="Carregar outro dashboard_dados.js">Carregar dados…</button>
+    <input type="file" id="arq" accept=".js,.json" hidden>
+  </div>
+</header>
+
+<main id="app">
+  <div class="vazio-msg" id="semDados">Nenhum dado carregado. Rode o robô (ou <code>analise_cilia.py</code>) para gerar <b>dashboard_dados.js</b> nesta pasta, ou use “Carregar dados…”.</div>
+</main>
+
+<div id="ov"></div>
+<aside id="dw"><div class="top"><h3 id="dwT">NF</h3><span class="sp" style="flex:1"></span><button id="dwX">Fechar ✕</button></div><div class="bd" id="dwB"></div></aside>
+<div id="tip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>window.FIREBASE_CONFIG = {"projectId": "pendencias-seguradoras", "appId": "1:697215792147:web:e91381d4edc2cf4806bbe6", "storageBucket": "pendencias-seguradoras.firebasestorage.app", "apiKey": "AIzaSyA5e7bgdZ92fa8kYaDIuvhrabUgWLd1xxc", "authDomain": "pendencias-seguradoras.firebaseapp.com", "messagingSenderId": "697215792147", "projectNumber": "697215792147", "version": "2"};</script>
+<script>// Backend Firebase (Firestore) do dashboard de pendências de seguradora.
+// Coleção "seguradoras":  meta (info + vendedores) | parte_0..N (dados do robô) | respostas (map nf -> resposta)
+(function () {
+  firebase.initializeApp(window.FIREBASE_CONFIG);
+  const db = firebase.firestore();
+  const col = db.collection('seguradoras');
+  const q = new URLSearchParams(location.search);
+  window.VEND_INICIAL = q.get('v') || '';
+  window.WEB_URL = location.origin + location.pathname;
+  let META = null;
+
+  async function sha(s) {
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(s)));
+    return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+  }
+  function agora() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  window.BACK = {
+    async carregar() {
+      const m = await col.doc('meta').get();
+      if (!m.exists) return {dados: null, just: {}, vendedores: []};
+      META = m.data();
+      const partes = await Promise.all([...Array(META.partes || 0).keys()].map(i => col.doc('parte_' + i).get()));
+      const txt = partes.map(p => (p.data() || {}).txt || '').join('');
+      const r = await col.doc('respostas').get();
+      const just = (r.exists && r.data().m) || {};
+      return {
+        dados: JSON.parse(txt),
+        just,
+        vendedores: (META.vendedores || []).map(v => ({vendedor: v.vendedor, nome: v.nome, temPin: !!v.pin_hash})),
+      };
+    },
+    async salvar(r) {
+      const v = ((META && META.vendedores) || []).find(x => x.vendedor === r.vendedor) || {};
+      let por = v.nome || r.vendedor;
+      if (v.pin_hash) {
+        const h = await sha(r.pin || '');
+        if (h === (META.pin_gestor_hash || '#')) por = 'GESTOR';
+        else if (h !== v.pin_hash) throw new Error('PIN incorreto para ' + r.vendedor + '.');
+      }
+      if (!r.status) throw new Error('Informe a situação (Em andamento ou Concluído).');
+      const reg = {quando: agora(), status: r.status, acao: r.acao || '', nf_dev: r.nf_dev || '', obs: r.obs || '',
+                   vendedor: r.vendedor || '', portal: r.portal || '', seguradora: r.seguradora || '',
+                   categoria: r.categoria || '', por};
+      const FV = firebase.firestore.FieldValue;
+      await col.doc('respostas').set({m: {[r.nf]: Object.assign({}, reg, {hist: FV.arrayUnion(reg)})}}, {merge: true});
+      const atual = await col.doc('respostas').get();
+      return ((atual.data() || {}).m || {})[r.nf] || Object.assign({hist: [reg]}, reg);
+    },
+  };
+})();
+</script>
+<script>
+const CAT_ESTILO = {
+  dev_pendente:     {c:'var(--critical)', i:'↩', dk:false, d:'Portal confirma a devolução, mas o vendedor não lançou no sistema – financeiro não consegue baixar.'},
+  dev_nf_cilia:     {c:'var(--serious)',  i:'⇄', dk:false, d:'Devolução já lançada (saldo abatido), mas falta anexar a NF de devolução no portal.'},
+  dev_divergente:   {c:'var(--serious)',  i:'≠', dk:false, d:'Devolução lançada, mas o saldo não bate com o valor devolvido no portal.'},
+  valor_incorreto:  {c:'var(--serious)',  i:'$', dk:false, d:'Valor da nota diferente do aprovado no laudo / da NF anexada no portal.'},
+  nf_nao_anexada:   {c:'var(--warning)',  i:'!', dk:true,  d:'A nota não foi inserida no pedido do portal – seguradora não paga.'},
+  entrega_pendente: {c:'var(--warning)',  i:'⏱', dk:true, d:'Peças sem baixa de entrega no portal.'},
+  ok_aguardando:    {c:'var(--good)',     i:'✓', dk:false, d:'Tudo certo no portal – só falta a seguradora pagar (cobrar).'},
+  nao_localizado:   {c:'var(--neutral)',  i:'?', dk:false, d:'Pedido/sinistro/placa não encontrados no portal.'},
+  nao_consultado:   {c:'var(--info)',     i:'…', dk:false, d:'Robô ainda não consultou este pedido.'},
+};
+const GRUPOS = [
+  {id:'dev', nome:'Devolução', i:'↩', c:'var(--critical)', d:'Peças devolvidas/canceladas no portal', cats:['dev_pendente','dev_nf_cilia','dev_divergente'], extra:true},
+  {id:'nf', nome:'Problema na nota fiscal', i:'$', c:'var(--serious)', d:'Nota não inserida no portal ou emitida com valor errado', cats:['nf_nao_anexada','valor_incorreto']},
+  {id:'ent', nome:'Entrega não baixada no portal', i:'⏱', c:'var(--warning)', dk:true, d:'Peças sem baixa de entrega', cats:['entrega_pendente']},
+  {id:'ok', nome:'OK – aguardando pagamento', i:'✓', c:'var(--good)', d:'Tudo certo no portal – cobrar a seguradora', cats:['ok_aguardando']},
+  {id:'out', nome:'Sem informação do portal', i:'?', c:'var(--neutral)', d:'Não localizado ou ainda não consultado', cats:['nao_localizado','nao_consultado']},
+];
+const NOME_SUB = {dev_pendente:'Não lançada no sistema (saldo integral)', dev_nf_cilia:'Lançada, falta NF de devolução no portal', dev_divergente:'Lançada com valor divergente',
+  nf_nao_anexada:'Nota não inserida no portal', valor_incorreto:'Nota emitida com valor incorreto', entrega_pendente:'Entrega não baixada', ok_aguardando:'OK – aguardando pagamento',
+  nao_localizado:'Não localizado no portal', nao_consultado:'Aguardando consulta do robô'};
+const GRUPO_ITEM = {
+  entregue:['Entregue','var(--good)'], em_entrega:['Em entrega','var(--warning)'], aguardando_nota:['Ag. nota / aprovado','var(--warning)'],
+  devolvido:['Devolvido','var(--critical)'], cancelado:['Cancelado','var(--critical)'], nao_aprovado:['Fora da NF / não comprado','var(--neutral)'], outro:['Outro','var(--neutral)']
+};
+const brl = v => (v==null||isNaN(v)) ? '—' : v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let D=null, sel={cat:null, sinal:null, seg:null, cf:null, grupo:null}, ordem={k:'saldo',dir:-1};
+
+function carregar(d){
+  D=d; const PR=D.portais_robo||{CILIA:'Cilia'};
+  D.cil = D.notas.filter(n=>n.portal in PR);
+  D.outros = D.notas.filter(n=>!(n.portal in PR));
+  fPortal.innerHTML='<option value="">Todos os portais</option>'+Object.entries(PR).map(([k,v])=>`<option value="${k}">${esc(v)} (${D.cil.filter(n=>n.portal===k).length})</option>`).join('');
+  document.getElementById('meta').textContent = `Planilha: ${D.planilha} · gerado em ${D.gerado_em}`;
+  const segs=[...new Set(D.cil.map(n=>nomeSeg(n.cliente)))].sort();
+  const vends=[...new Set(D.cil.map(n=>n.vendedor).filter(Boolean))].sort();
+  fSeg.innerHTML='<option value="">Todas as seguradoras</option>'+segs.map(s=>`<option>${esc(s)}</option>`).join('');
+  fVend.innerHTML='<option value="">Todos os vendedores</option>'+vends.map(s=>`<option>${esc(s)}</option>`).join('');
+  render();
+}
+function nomeSeg(c){ // agrupa variações do nome (S/A, S.A., SUCURSAL…)
+  c=(c||'').toUpperCase().replace(/\s+/g,' ');
+  for (const k of ['ALLIANZ','SURA','ZURICH','TOKIO','MAPFRE','CAIXA','EZZE','DARWIN','HDI','PORTO','BRADESCO','LIBERTY','YELUM','SOMPO','AZUL','ITAU','SUHAI','TOKIO','GENERALI','MITSUI','JUSTOS','PIER','YOUSE'])
+    if (c.includes(k)) return k==='TOKIO'?'TOKIO MARINE':k;
+  return c.split(' ').slice(0,2).join(' ');
+}
+function filtradas(ignorarCat, ignorarVend){
+  const q=fBusca.value.trim().toUpperCase().replace(/[\s\-]/g,'');
+  return D.cil.filter(n=>{
+    if (fPortal.value && n.portal!==fPortal.value) return false;
+    if (fSeg.value && nomeSeg(n.cliente)!==fSeg.value) return false;
+    if (!ignorarVend && fVend.value && n.vendedor!==fVend.value) return false;
+    if (sel.seg && nomeSeg(n.cliente)!==sel.seg) return false;
+    if (!ignorarCat && sel.cat && n.categoria!==sel.cat) return false;
+    if (!ignorarCat && sel.grupo && !GRUPOS.find(g=>g.id===sel.grupo).cats.includes(n.categoria)) return false;
+    if (!ignorarCat && sel.cf && (sel.cf==='tela_devolver'?!n.tela_devolver:n.conf_fin!==sel.cf)) return false;
+    if (!ignorarCat && sel.sinal && !(n.sinais_fin||[]).includes(sel.sinal)) return false;
+    if (q){ const h=[n.nf,n.pedido,n.sinistro,n.placa,n.cliente].join('|').toUpperCase().replace(/[\s\-]/g,''); if(!h.includes(q)) return false; }
+    return true;
+  });
+}
+function soma(a,k){return a.reduce((s,n)=>s+(n[k]||0),0)}
+
+function render(){
+  if (modoVend) return renderVend();
+  const base=filtradas(true);
+  const conf=base.filter(n=>n.confirmado);
+  const app=document.getElementById('app');
+  const porCat={}; Object.keys(D.categorias).forEach(k=>porCat[k]=base.filter(n=>n.categoria===k));
+  const vencidas=base.filter(n=>(n.dias_atraso||0)>0);
+  let h=`<div class="kpis">
+    <div class="kpi"><div class="l">Saldo em aberto (portais)</div><div class="v">${brl(soma(base,'saldo'))}</div><div class="s">${base.length} NFs · ${new Set(base.map(n=>n.pedido_base)).size} pedidos</div></div>
+    <div class="kpi"><div class="l">Devolução não lançada no sistema</div><div class="v">${brl(soma(porCat.dev_pendente,'saldo'))}</div><div class="s">${porCat.dev_pendente.length} NFs</div></div>
+    <div class="kpi"><div class="l">OK – só falta a seguradora pagar</div><div class="v">${brl(soma(porCat.ok_aguardando,'saldo'))}</div><div class="s">${porCat.ok_aguardando.length} NFs</div></div>
+    <div class="kpi"><div class="l">Vencidas</div><div class="v">${brl(soma(vencidas,'saldo'))}</div><div class="s">${vencidas.length} NFs · média ${vencidas.length?Math.round(vencidas.reduce((s,n)=>s+n.dias_atraso,0)/vencidas.length):0} dias</div></div>
+    <div class="kpi"><div class="l">Consultadas no portal</div><div class="v">${conf.length}/${base.length}</div><div class="s">${porCat.nao_consultado.length} aguardando robô</div></div>
+  </div>
+  <h2>Por que não foi pago – situação no portal</h2><p class="muted" style="margin:-4px 0 12px;font-size:12px">Cada nota está em um único grupo/subtópico. Clique no grupo ou no subtópico para ver as notas.</p><div class="grupos">`;
+  for (const g of GRUPOS){
+    const a=base.filter(n=>g.cats.includes(n.categoria));
+    h+=`<div class="grupo ${g.extra?'largo':''} ${sel.grupo===g.id?'ativo':''} ${a.length?'':'vazio'}" style="--c:${g.c}">
+      <div class="gh" data-grupo="${g.id}"><span class="ico ${g.dk?'dk':''}">${g.i}</span><div class="gt"><b>${g.nome}</b><span class="muted">${g.d}</span></div>
+        ${a.length?`<button class="mini" data-xgrupo="${g.id}" title="Exportar Excel do grupo">⤓ Excel</button>`:''}</div>
+      <div class="gn"><span class="n">${a.length}</span> <span class="muted">NFs</span> <span class="r">${brl(soma(a,'saldo'))}</span></div>`;
+    if (g.cats.length>1 || g.extra){
+      h+=`<div class="subs">`+g.cats.map(k=>{const b=a.filter(n=>n.categoria===k), st=CAT_ESTILO[k]||{};
+        return `<div class="sub ${sel.cat===k?'ativo':''} ${b.length?'':'z'}" data-cat="${k}" title="${esc(st.d||'')}"><i style="background:${st.c}"></i><span>${esc(NOME_SUB[k]||D.categorias[k])}</span><b>${b.length}</b><span class="r">${brl(soma(b,'saldo'))}</span>${b.length?`<button class="mini" data-xcat="${k}" title="Exportar Excel">⤓</button>`:'<span></span>'}</div>`}).join('');
+      if (g.extra){
+        h+=`<div class="subsep">Conferência com a anotação do financeiro <span class="muted">(notas já contadas em algum grupo)</span></div>`+
+          [['tela_devolver','Consta na tela A DEVOLVER do Prismatec','var(--critical)'],['cilia_sem_fin','Portal mostra devolução que o financeiro não anotou','var(--serious)'],['fin_sem_cilia','Financeiro anotou devolução, mas o portal não mostra','var(--neutral)']].map(([k,t,c])=>{const b=base.filter(n=>k==='tela_devolver'?!!n.tela_devolver:n.conf_fin===k);
+          return `<div class="sub ${sel.cf===k?'ativo':''} ${b.length?'':'z'}" data-cf="${k}"><i style="background:${c}"></i><span>${t}</span><b>${b.length}</b><span class="r">${brl(soma(b,'saldo'))}</span><span></span></div>`}).join('');
+      }
+      h+=`</div>`;
+    } else {
+      const st=CAT_ESTILO[g.cats[0]]||{}; h+=`<div class="d muted" style="font-size:12px;margin-top:6px">${esc(st.d||'')}</div>`;
+    }
+    h+=`</div>`;
+  }
+  h+=`</div>`;
+
+  // por vendedor
+  const baseV=filtradas(true,true), vend={};
+  baseV.forEach(n=>{const v=n.vendedor||'(sem vendedor)';(vend[v]=vend[v]||[]).push(n)});
+  const cats=Object.keys(D.categorias);
+  const abrev={dev_pendente:'Dev. não lançada',dev_nf_cilia:'Falta NF dev. portal',dev_divergente:'Dev. divergente',valor_incorreto:'Valor incorreto',nf_nao_anexada:'Nota não inserida',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK',nao_localizado:'Não localiz.',nao_consultado:'Ag. robô'};
+  const PROB=['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','nf_nao_anexada','entrega_pendente','nao_localizado'];
+  const vArr=Object.entries(vend).map(([v,a])=>({v,a,prob:a.filter(n=>PROB.includes(n.categoria))})).sort((x,y)=>soma(y.prob,'saldo')-soma(x.prob,'saldo')||soma(y.a,'saldo')-soma(x.a,'saldo'));
+  h+=`<div class="listahdr"><h2>Problemas por vendedor</h2><span class="sp"></span><button id="xvendtodos" title="Um arquivo com uma aba por vendedor">⤓ Excel – todos os vendedores</button></div>
+  <div class="tabwrap" style="max-height:none"><table class="vend"><thead><tr><th>Vendedor</th><th class="num">NFs</th><th class="num">Saldo</th><th class="num">Saldo c/ problema</th><th class="num" title="Casos críticos respondidos / concluídos pelo vendedor">Respostas</th>${cats.map(k=>`<th style="text-align:center"><span class="tag" style="--c:${CAT_ESTILO[k].c}"><i></i>${abrev[k]}</span></th>`).join('')}<th></th></tr></thead><tbody>`+
+    vArr.map(({v,a,prob})=>`<tr class="${fVend.value===v?'on':''}" style="cursor:default"><td><a href="#" data-abrirvend="${esc(v)}" title="Abrir a página do vendedor"><b>${esc(v)}</b></a></td><td class="num">${a.length}</td><td class="num">${brl(soma(a,'saldo'))}</td><td class="num ${prob.length?'vermelho':''}">${brl(soma(prob,'saldo'))}</td><td class="num">${respResumo(a)}</td>`+
+      cats.map(k=>{const q=a.filter(n=>n.categoria===k).length;return `<td class="c ${q?'':'z'}" ${q?`data-vend="${esc(v)}" data-vcat="${k}" data-tip="${esc(v)} · ${esc(D.categorias[k])}: ${q} NFs · ${brl(soma(a.filter(n=>n.categoria===k),'saldo'))}"`:''}>${q||'·'}</td>`}).join('')+
+      `<td style="white-space:nowrap"><button class="mini" data-vver="${esc(v)}">${fVend.value===v?'Todos':'Ver'}</button> <button class="mini" data-xvend="${esc(v)}">⤓ Excel</button></td></tr>`).join('')+
+    `</tbody></table></div>`;
+
+  // sinais do financeiro + seguradoras
+  const sinais={}; base.forEach(n=>(n.sinais_fin||[]).forEach(s=>{(sinais[s]=sinais[s]||[]).push(n)}));
+  const segs={}; base.forEach(n=>{const s=nomeSeg(n.cliente);(segs[s]=segs[s]||[]).push(n)});
+  const segArr=Object.entries(segs).map(([s,a])=>[s,soma(a,'saldo'),a.length]).sort((a,b)=>b[1]-a[1]);
+  const mx=segArr.length?segArr[0][1]:1;
+  h+=`<div class="dois"><div><h2>Saldo por seguradora</h2><div class="painel">`+
+    segArr.map(([s,v,q])=>`<div class="barra" data-seg="${esc(s)}" data-tip="${esc(s)}: ${brl(v)} · ${q} NFs" ${sel.seg===s?'style="background:var(--accent-wash)"':''}>
+      <span class="nm">${esc(s)}</span><span class="tr"><div class="fl" style="width:${Math.max(1,v/mx*100)}%"></div></span><span class="vl">${brl(v)}</span></div>`).join('')+
+    `</div></div><div><h2>Anotações do financeiro</h2><div class="painel"><div class="chips">`+
+    Object.entries(sinais).sort((a,b)=>b[1].length-a[1].length).map(([s,a])=>`<span class="chip ${sel.sinal===s?'ativo':''}" data-sinal="${esc(s)}">${esc(s)} <b>${a.length}</b> · ${brl(soma(a,'saldo'))}</span>`).join('')+
+    `</div><p class="muted" style="margin:10px 0 0;font-size:12px">Extraído da coluna “Observação” da planilha. É só referência: a situação de cada nota vale sempre pelo que o robô lê no portal.</p>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Portais ainda sem robô: ${Object.entries(D.outros.reduce((o,n)=>(o[n.portal]=(o[n.portal]||0)+1,o),{})).map(([p,q])=>`${esc(p)} ${q}`).join(' · ')}</p></div></div></div>`;
+
+  // lista
+  const lista=filtradas(false);
+  const CFN={tela_devolver:'Consta na tela A DEVOLVER do Prismatec',fin_sem_cilia:'Financeiro anotou devolução, mas o portal não mostra',cilia_sem_fin:'Portal mostra devolução que o financeiro não anotou'};
+  const titBase = sel.cf? CFN[sel.cf] : sel.cat? (GRUPOS.find(g=>g.cats.includes(sel.cat))||{}).nome+' › '+(NOME_SUB[sel.cat]||D.categorias[sel.cat]) : sel.grupo? GRUPOS.find(g=>g.id===sel.grupo).nome : sel.sinal? 'Financeiro: '+sel.sinal : 'Todas as NFs portal';
+  window._tit=titBase;
+  const tit = titBase + (fVend.value?' · '+fVend.value:'');
+  h+=`<div class="listahdr" id="lista"><h2>${esc(tit)}${sel.seg?' · '+esc(sel.seg):''} — ${lista.length} NFs · ${brl(soma(lista,'saldo'))}</h2><span class="sp"></span>
+     ${(sel.cat||sel.sinal||sel.seg||sel.cf||sel.grupo)?'<button id="limpar">Limpar seleção</button>':''}<button id="xlista">⤓ Excel desta lista</button></div>`;
+  h+=tabela(lista);
+  app.innerHTML=h;
+}
+const COLS=[['nf','NF'],['portal_nome','Portal'],['vendedor','Vendedor'],['emissao','Emissão'],['vencimento','Venc.'],['dias_atraso','Atraso',1],['cliente','Seguradora'],['pedido','Pedido'],['sinistro','Sinistro'],['placa','Placa'],
+  ['valor','Valor NF',1],['saldo','Saldo',1],['valor_esperado','Valor portal',1],['valor_devolvido','Devolvido',1],['categoria','Situação'],['resp','Resposta vendedor'],['motivo','Motivo']];
+function tabela(lista){
+  const k=ordem.k, dir=ordem.dir;
+  lista=[...lista].sort((a,b)=>{let x=a[k],y=b[k]; if(k==='emissao'||k==='vencimento'){x=dt(x);y=dt(y)}
+    if(x==null) return 1; if(y==null) return -1; return (x>y?1:x<y?-1:0)*dir;});
+  if(!lista.length) return '<div class="painel vazio-msg">Nenhuma NF nesta seleção.</div>';
+  return `<div class="tabwrap"><table><thead><tr>${COLS.map(([c,t,nu])=>`<th class="${nu?'num':''}" data-ord="${c}">${t}${ordem.k===c?(dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>`+
+    lista.map(n=>{const st=CAT_ESTILO[n.categoria]||{}; return `<tr data-nf="${esc(n.nf)}">
+      <td><b>${esc(n.nf)}</b></td><td>${esc(n.portal_nome||'')}</td><td>${esc(n.vendedor||'')}</td><td>${esc(n.emissao)}</td><td>${esc(n.vencimento)}</td>
+      <td class="num ${n.dias_atraso>60?'vermelho':''}">${n.dias_atraso??''}</td><td>${esc(nomeSeg(n.cliente))}</td>
+      <td>${esc(n.pedido)}</td><td>${esc(n.sinistro)}</td><td>${esc(n.placa)}</td>
+      <td class="num">${brl(n.valor)}</td><td class="num">${brl(n.saldo)}</td><td class="num">${n.valor_esperado==null?'—':brl(n.valor_esperado)}</td>
+      <td class="num">${n.valor_devolvido?brl(n.valor_devolvido):'—'}</td>
+      <td><span class="tag" style="--c:${st.c}"><i></i>${esc(NOME_SUB[n.categoria]||D.categorias[n.categoria]||'')}</span></td>
+      <td>${tagResp(n)}</td>
+      <td class="mot">${esc((n.motivos||[])[0]||'')}</td></tr>`}).join('')+`</tbody></table></div>`;
+}
+function dt(s){const m=/(\d+)\/(\d+)\/(\d+)/.exec(s||'');return m?+(m[3]+m[2].padStart(2,'0')+m[1].padStart(2,'0')):null}
+
+function detalhe(nf){
+  const n=D.cil.find(x=>x.nf===nf); if(!n) return;
+  const c=n.cilia||{}, st=CAT_ESTILO[n.categoria]||{};
+  dwT.innerHTML=`NF ${esc(n.nf)} · <span class="tag" style="--c:${st.c}"><i></i>${esc(NOME_SUB[n.categoria]||D.categorias[n.categoria])}</span>`;
+  const campo=(l,v)=>`<div class="campo"><div class="l">${l}</div><div class="v">${v}</div></div>`;
+  let h=`<div class="alerta" style="--c:${st.c}"><b>${esc(NOME_SUB[n.categoria]||D.categorias[n.categoria])}</b>${n.confirmado?'':' <span class="muted">(ainda não confirmado no portal)</span>'}<ul style="margin:6px 0 0;padding-left:18px">${(n.motivos||[]).map(m=>`<li>${esc(m)}</li>`).join('')||'<li class="muted">Sem observações.</li>'}</ul></div>`;
+  h+=`<div class="grid2">${campo('Seguradora',esc(n.cliente))}${campo('CNPJ',esc(n.cnpj))}${campo('Emissão / Venc.',esc(n.emissao)+' · '+esc(n.vencimento))}${campo('Atraso',(n.dias_atraso??'—')+' dias')}
+    ${campo('Valor NF',brl(n.valor))}${campo('Saldo',brl(n.saldo))}${campo('Peças desta NF no portal',n.valor_esperado==null?'—':brl(n.valor_esperado))}${campo('Devolvido no portal',n.valor_devolvido==null?'—':brl(n.valor_devolvido))}
+    ${campo('Pedido',esc(n.pedido))}${campo('Sinistro',esc(n.sinistro))}${campo('Placa',esc(n.placa))}${campo('Vendedor',esc(n.vendedor))}</div>`;
+  if (n.cilia){
+    h+=`<h2>${esc(n.portal_nome||'Portal')}</h2><div class="grid2">${campo('Encontrado por',esc(c.busca||'—'))}${campo('Consultado em',esc((c.consultado_em||'').replace('T',' ')))}
+      ${campo('Seguradora no portal',esc(c.seguradora||'—'))}${campo('Veículo',esc((c.veiculo||'—')+(c.placa_cilia?' · '+c.placa_cilia:'')))}${campo('Oficina',esc((c.oficina||'—')+(c.oficina_cidade&&c.oficina_cidade!=='/'?' · '+c.oficina_cidade:'')))}${campo('Pedido criado em',esc((c.criado_em||'').split('-').reverse().join('/')||'—'))}
+      ${campo('Total pedido / Líquido',brl(c.total_pedido)+' / '+brl(c.total_liquido))}${campo('NFs anexadas',esc((c.notas_fiscais||[]).join(', ')||(c.notas_lidas?'nenhuma':'não lido')))}
+      ${c.aba?campo('Aba',esc(c.aba)):''}${c.url?campo('Link',`<a href="${esc(c.url)}" target="_blank">abrir no portal ↗</a>`):''}</div>`;
+    const it=[...(c.itens||[])].sort((a,b)=>(b.desta_nf?1:0)-(a.desta_nf?1:0)||((a.grupo==='nao_aprovado')-(b.grupo==='nao_aprovado')));
+    const rn=(c.resumo_nf||[]);
+    if (rn.length) h+=`<div class="grid2">`+rn.map(r=>campo(''+esc(n.portal_nome||'Portal')+' · '+esc(r.unidade||''),
+        `NF venda ${brl(r.nf_venda)} · NF devolução ${brl(r.nf_devolucao)}<br>Saldo ${brl(r.saldo)}${r.saldo_reserva?` · Reserva ${brl(r.saldo_reserva)}`:''}`)).join('')+`</div>`;
+    if ((c.notas_detalhe||[]).length) h+=`<h2>NFs anexadas no portal</h2><div class="tabwrap"><table><thead><tr><th>NF</th><th>Tipo</th><th>Situação</th><th class="num">Valor</th><th>Peças</th></tr></thead><tbody>`+
+       c.notas_detalhe.map(x=>`<tr style="cursor:default${x.numero.replace(/^0+/,'')===n.nf.replace(/^0+/,'')?';background:var(--accent-wash)':''}"><td><b>${esc(x.numero)}</b></td><td>${esc(x.tipo)}</td><td>${esc(x.situacao)}${x.recusa?' – '+esc(x.recusa):''}</td><td class="num">${brl(x.valor)}</td><td style="white-space:normal">${esc((x.itens||[]).join(', '))}</td></tr>`).join('')+`</tbody></table></div>`;
+    const daNF=it.filter(i=>i.desta_nf).length;
+    h+=`<h2>Peças do pedido (${it.length})${daNF?` <span class="muted" style="text-transform:none">– destacadas as ${daNF} desta NF</span>`:(n.itens_escopo==='pedido'?' <span class="muted" style="text-transform:none">– pedido inteiro</span>':'')}</h2>`;
+    h+= it.length?`<div class="tabwrap"><table><thead><tr><th>Status portal</th><th>Grupo</th><th class="num">Qtd</th><th>Código</th><th>Item</th><th class="num">Preço un.</th><th class="num">Total</th><th>NF</th><th>Prev. entrega</th></tr></thead><tbody>`+
+      it.map(i=>{const g=GRUPO_ITEM[i.grupo]||GRUPO_ITEM.outro; const fora=i.grupo==='nao_aprovado';
+        return `<tr style="cursor:default${i.desta_nf?';background:var(--accent-wash)':''}${fora?';opacity:.55':''}"><td>${esc(i.status_nome||i.status)}</td><td><span class="tag" style="--c:${g[1]}"><i></i>${g[0]}</span></td>
+        <td class="num">${esc(i.qtd)}</td><td>${esc(i.codigo||'')}</td><td style="white-space:normal;min-width:240px${fora?';text-decoration:line-through':''}">${esc(i.item)}</td><td class="num">${i.preco_un!=null&&i.preco_un!==''?(typeof i.preco_un==='number'?brl(i.preco_un):esc(i.preco_un)):''}</td><td class="num">${i.total!=null?brl(i.total):''}</td><td>${esc(i.nf||'')}${i.dev_pendente?' <span class="tag" style="--c:var(--critical)"><i></i>dev. pendente</span>':''}</td><td>${esc((i.prev_entrega||'').split('-').reverse().join('/'))}</td></tr>`}).join('')+`</tbody></table></div>`
+      : `<div class="painel muted">${c.encontrado?'Itens não lidos.':esc(c.erro||'Não encontrado.')}</div>`;
+    if (c.notas_texto) h+=`<h2>Notas Fiscais (texto capturado)</h2><pre>${esc(c.notas_texto)}</pre>`;
+  }
+  const hist=(n.obs_financeiro||'').split(/\s{2,}|(?=\b\d{2}\/\d{2}\s)/).map(s=>s.trim()).filter(Boolean);
+  h+=blocoRespostaDrawer(n);
+  h+=`<h2>Histórico do financeiro</h2><div class="hist">${hist.map(s=>`<div>${esc(s)}</div>`).join('')||'<div class="muted">Sem anotações.</div>'}</div>`;
+  h+=`<h2>Observação da nota</h2><pre>${esc(n.obs_nota)}</pre>`;
+  if (c.texto_pagina) h+=`<details><summary class="muted">Texto bruto da página do portal</summary><pre>${esc(c.texto_pagina)}</pre></details>`;
+  dwB.innerHTML=h; dw.classList.add('on'); ov.classList.add('on'); dw.scrollTop=0;
+}
+function fechar(){dw.classList.remove('on');ov.classList.remove('on')}
+// ------------------------- EXPORTAÇÃO EXCEL -------------------------------
+const CFN_X={confirmada:'Devolução confirmada no portal',fin_sem_cilia:'Financeiro diz devolução, portal não mostra',cilia_sem_fin:'Portal mostra devolução não anotada',pendente:'Anotação aguardando robô'};
+function linhasNotas(l){
+  return l.map(n=>({'NF':n.nf,'Portal':n.portal_nome||'','Emissão':n.emissao,'Vencimento':n.vencimento,'Dias atraso':n.dias_atraso,'Seguradora':n.cliente,'CNPJ':n.cnpj,
+    'Vendedor':n.vendedor,'Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa,'Valor NF':n.valor,'Saldo':n.saldo,
+    'Peças desta NF no portal':n.valor_esperado??'','Devolvido no portal':n.valor_devolvido??'','Grupo':(GRUPOS.find(g=>g.cats.includes(n.categoria))||{}).nome||'','Situação':NOME_SUB[n.categoria]||D.categorias[n.categoria]||'',
+    'Motivo':(n.motivos||[]).join(' | '),'Resposta – status':(JUST[n.nf]||{}).status||'','Resposta – ação':(JUST[n.nf]||{}).acao||'','Resposta – Nº NF':(JUST[n.nf]||{}).nf_dev||'','Resposta – obs.':(JUST[n.nf]||{}).obs||'','Resposta – data':(JUST[n.nf]||{}).quando||'','Financeiro x portal':CFN_X[n.conf_fin]||'','Obs. financeiro':n.obs_financeiro,
+    'Consultado em':((n.cilia||{}).consultado_em||'').replace('T',' '),'Link portal':(n.cilia||{}).url||''}));
+}
+function linhasItens(l){
+  const out=[];
+  l.forEach(n=>{const it=(n.cilia||{}).itens||[]; let sel=it.filter(i=>i.desta_nf); if(!sel.length) sel=it.filter(i=>i.grupo!=='nao_aprovado');
+    sel.forEach(i=>out.push({'NF':n.nf,'Portal':n.portal_nome||'','Vendedor':n.vendedor,'Seguradora':n.cliente,'Pedido':n.pedido,'Situação da NF':D.categorias[n.categoria]||'',
+      'Status portal':i.status_nome||i.status,'Código':i.codigo||'','Item':i.item,'Qtd':i.qtd,'Preço un.':typeof i.preco_un==='number'?i.preco_un:(i.preco_un||''),
+      'Total':i.total??'','NF da peça':i.nf||'','NF devolução pendente':i.dev_pendente?'SIM':''}));});
+  return out;
+}
+function linhasResumo(l){
+  return Object.entries(D.categorias).map(([k,nm])=>{const a=l.filter(n=>n.categoria===k);return {'Situação':nm,'NFs':a.length,'Saldo':Math.round(soma(a,'saldo')*100)/100}}).filter(r=>r.NFs);
+}
+function nomeAba(s){return String(s).replace(/[\[\]:*?\/\\]/g,'-').slice(0,31)||'Aba'}
+function nomeArq(s){return String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').slice(0,80)}
+function carregarXLSX(){
+  return new Promise(ok=>{ if(window.XLSX) return ok(true);
+    const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload=()=>ok(!!window.XLSX); s.onerror=()=>ok(false); document.head.appendChild(s); setTimeout(()=>ok(!!window.XLSX),8000);});
+}
+async function exportar(arquivo, abas){
+  const dt=new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+  arquivo=nomeArq(arquivo)+'_'+dt;
+  if(await carregarXLSX()){
+    const wb=XLSX.utils.book_new();
+    for(const [nome,rows] of Object.entries(abas)){
+      const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'':'Sem registros'}]);
+      const cab=Object.keys(rows[0]||{'':''});
+      ws['!cols']=cab.map(c=>({wch:Math.min(60,Math.max(c.length+2,...rows.slice(0,200).map(r=>String(r[c]??'').length+1)))}));
+      ws['!autofilter']={ref:ws['!ref']};
+      XLSX.utils.book_append_sheet(wb,ws,nomeAba(nome));
+    }
+    XLSX.writeFile(wb,arquivo+'.xlsx');
+  } else { // sem internet: CSV da primeira aba
+    const rows=Object.values(abas).find(r=>r.length)||[]; const cab=Object.keys(rows[0]||{});
+    const f=v=>typeof v==='number'?String(v).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
+    const b=new Blob(['﻿'+cab.join(';')+'\n'+rows.map(r=>cab.map(c=>f(r[c])).join(';')).join('\n')],{type:'text/csv'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=arquivo+'.csv';a.click();
+    alert('Sem acesso à biblioteca do Excel (internet). Exportei em CSV, que também abre no Excel.');
+  }
+}
+function exportarGrupo(id){ const g=GRUPOS.find(x=>x.id===id); const l=filtradas(true).filter(n=>g.cats.includes(n.categoria));
+  const abas={}; g.cats.forEach(k=>{const a=l.filter(n=>n.categoria===k); if(a.length) abas[(NOME_SUB[k]||k).slice(0,31)]=linhasNotas(a);}); abas['Peças']=linhasItens(l);
+  exportar('Seguradoras_'+g.nome+(fVend.value?'_'+fVend.value:''),abas); }
+function exportarCategoria(k){ const l=filtradas(true).filter(n=>n.categoria===k);
+  exportar('Seguradoras_'+(NOME_SUB[k]||D.categorias[k])+(fVend.value?'_'+fVend.value:''),{'Notas':linhasNotas(l),'Peças':linhasItens(l)}); }
+function exportarVendedor(v){ const l=filtradas(true,true).filter(n=>(n.vendedor||'(sem vendedor)')===v);
+  const abas={'Resumo':linhasResumo(l)};
+  const CURTO={dev_pendente:'Devolução não lançada',dev_nf_cilia:'Falta NF devolução portal',dev_divergente:'Devolução divergente',valor_incorreto:'Valor incorreto',nf_nao_anexada:'Nota não inserida portal',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK aguardando pgto',nao_localizado:'Não localizado',nao_consultado:'Aguardando robô'};
+  Object.keys(D.categorias).forEach(k=>{const a=l.filter(n=>n.categoria===k); if(a.length) abas[CURTO[k]||k]=linhasNotas(a);});
+  abas['Peças']=linhasItens(l);
+  exportar('Seguradoras_vendedor_'+v,abas); }
+function exportarTodosVendedores(){ const l=filtradas(true,true), abas={};
+  abas['Resumo']=Object.entries(l.reduce((o,n)=>((o[n.vendedor||'(sem vendedor)']=o[n.vendedor||'(sem vendedor)']||[]).push(n),o),{}))
+    .map(([v,a])=>{const r={'Vendedor':v,'NFs':a.length,'Saldo':Math.round(soma(a,'saldo')*100)/100};Object.entries(D.categorias).forEach(([k,nm])=>r[nm]=a.filter(n=>n.categoria===k).length);return r;});
+  [...new Set(l.map(n=>n.vendedor||'(sem vendedor)'))].sort().forEach(v=>abas[v]=linhasNotas(l.filter(n=>(n.vendedor||'(sem vendedor)')===v)));
+  exportar('Seguradoras_por_vendedor',abas); }
+function exportarLista(){ const l=filtradas(false); exportar('Seguradoras_'+(window._tit||'lista')+(fVend.value?'_'+fVend.value:''),{'Notas':linhasNotas(l),'Peças':linhasItens(l)}); }
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const av=t.closest('[data-abrirvend]'); if(av){e.preventDefault(); abrirVend(av.dataset.abrirvend); return;}
+  const xg=t.closest('[data-xgrupo]'); if(xg){exportarGrupo(xg.dataset.xgrupo); return;}
+  const gr=t.closest('[data-grupo]'); if(gr){sel.grupo=sel.grupo===gr.dataset.grupo?null:gr.dataset.grupo; sel.cat=null; sel.cf=null; sel.sinal=null; render(); document.getElementById('lista').scrollIntoView({behavior:'smooth'}); return;}
+  const xc=t.closest('[data-xcat]'); if(xc){e.stopPropagation(); exportarCategoria(xc.dataset.xcat); return;}
+  const xv=t.closest('[data-xvend]'); if(xv){exportarVendedor(xv.dataset.xvend); return;}
+  const vv=t.closest('[data-vver]'); if(vv){fVend.value=fVend.value===vv.dataset.vver?'':vv.dataset.vver; render(); return;}
+  const vc=t.closest('[data-vcat]'); if(vc){fVend.value=vc.dataset.vend; sel={cat:vc.dataset.vcat,sinal:null,seg:null,cf:null,grupo:null}; render(); document.getElementById('lista').scrollIntoView({behavior:'smooth'}); return;}
+  if(t.id==='xvendtodos'){exportarTodosVendedores(); return;}
+  if(t.id==='xlista'){exportarLista(); return;}
+  const card=t.closest('[data-cat]'); if(card){sel.cat=sel.cat===card.dataset.cat?null:card.dataset.cat; sel.sinal=null; sel.cf=null; sel.grupo=null; render(); document.getElementById('lista').scrollIntoView({behavior:'smooth'}); return;}
+  const ch=t.closest('[data-sinal]'); if(ch){sel.sinal=sel.sinal===ch.dataset.sinal?null:ch.dataset.sinal; sel.cat=null; sel.cf=null; sel.grupo=null; render(); document.getElementById('lista').scrollIntoView({behavior:'smooth'}); return;}
+  const cf=t.closest('[data-cf]'); if(cf){sel.cf=sel.cf===cf.dataset.cf?null:cf.dataset.cf; sel.cat=null; sel.sinal=null; sel.grupo=null; render(); document.getElementById('lista').scrollIntoView({behavior:'smooth'}); return;}
+  const sg=t.closest('[data-seg]'); if(sg){sel.seg=sel.seg===sg.dataset.seg?null:sg.dataset.seg; render(); return;}
+  const th=t.closest('[data-ord]'); if(th){const k=th.dataset.ord==='motivo'?null:th.dataset.ord; if(!k)return; ordem={k,dir:ordem.k===k?-ordem.dir:-1}; render(); return;}
+  const tr=t.closest('tr[data-nf]'); if(tr){detalhe(tr.dataset.nf); return;}
+  if(t.id==='limpar'){sel={cat:null,sinal:null,seg:null,cf:null,grupo:null}; render(); return;}
+  if(t.id==='ov'||t.id==='dwX') fechar();
+  if(t.id==='btnArq') arq.click();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')fechar()});
+document.addEventListener('mousemove',e=>{const b=e.target.closest('[data-tip]'); if(b){tip.textContent=b.dataset.tip;tip.style.display='block';tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px'} else tip.style.display='none'});
+[fPortal,fSeg,fVend].forEach(x=>x.addEventListener('change',render));
+let tm; fBusca.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(render,200)});
+arq.addEventListener('change',async()=>{const f=arq.files[0]; if(!f) return; let s=await f.text(); s=s.replace(/^\s*window\.DADOS_CILIA\s*=\s*/,'').replace(/;\s*$/,''); carregar(JSON.parse(s));});
+// ===================== RESPOSTAS DOS VENDEDORES / PÁGINA DO VENDEDOR =====================
+let JUST = {}, VENDS = [], modoVend = null, filtroResp = 'todos';
+// backend: Firebase (window.BACK definido pela versão web) ou Google Apps Script
+function gsBack(){
+  const call=(fn,arg)=>new Promise((ok,ko)=>{ const r=google.script.run.withSuccessHandler(s=>ok(JSON.parse(s))).withFailureHandler(ko); arg===undefined?r[fn]():r[fn](arg); });
+  return {carregar:()=>call('getTudo'), salvar:r=>call('salvarJustificativa',r)};
+}
+const BACK = window.BACK || ((typeof google!=='undefined' && google.script && google.script.run) ? gsBack() : null);
+const MODO_WEB = !!BACK;
+const CRIT = ['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','nf_nao_anexada','entrega_pendente'];
+const FORMS = {
+  dev: {cats:['dev_pendente','dev_nf_cilia','dev_divergente'], titulo:'Devolução',
+        acoes:['NF de devolução emitida e anexada no portal','NF de devolução emitida – falta anexar no portal',
+               'Devolução solicitada ao faturamento (aguardando NF)','Peça não foi devolvida – contestar no portal',
+               'Devolução já baixada no financeiro','Outro'], nf:'Nº da NF de devolução'},
+  nf:  {cats:['nf_nao_anexada'], titulo:'Nota não inserida',
+        acoes:['NF inserida no portal','NF emitida por engano – cancelada/devolvida','NF pertence a outro pedido (informar na observação)','Outro'], nf:'Nº NF (se mudou)'},
+  val: {cats:['valor_incorreto'], titulo:'Valor incorreto',
+        acoes:['Carta de correção enviada','NF complementar emitida','NF cancelada e reemitida','Valor contestado com a seguradora','Outro'], nf:'Nº da nova NF'},
+  ent: {cats:['entrega_pendente'], titulo:'Entrega',
+        acoes:['Baixa de entrega feita no portal','Peça ainda não entregue','Outro'], nf:''},
+  out: {cats:['ok_aguardando','nao_localizado','nao_consultado'], titulo:'Outros',
+        acoes:['Cobrança feita com a seguradora','Pedido localizado no portal (informar na observação)','Outro'], nf:''},
+};
+function formDe(cat){ return Object.values(FORMS).find(f=>f.cats.includes(cat)) || FORMS.out; }
+function dataNum(s){ const m=/(\d+)\/(\d+)\/(\d+)\s*(\d+)?:?(\d+)?/.exec(s||''); return m? +(m[3]+m[2].padStart(2,'0')+m[1].padStart(2,'0')+(m[4]||'00').padStart(2,'0')+(m[5]||'00').padStart(2,'0')) : 0; }
+// concluído pelo vendedor, mas o robô (rodado depois) ainda vê a pendência
+function concluidoMasPendente(n){ const j=JUST[n.nf]; return j && j.status==='Concluído' && CRIT.includes(n.categoria) && D && dataNum(D.gerado_em) > dataNum(j.quando); }
+function tagResp(n){
+  const j=JUST[n.nf]; if(!j) return CRIT.includes(n.categoria)?'<span class="muted" style="font-size:12px">sem resposta</span>':'';
+  if (concluidoMasPendente(n)) return `<span class="tag" style="--c:var(--warning)" title="${esc(j.acao||'')} – ${esc(j.quando)}"><i></i>Concluído · portal ainda pendente</span>`;
+  const c = j.status==='Concluído' ? 'var(--good)' : 'var(--info)';
+  return `<span class="tag" style="--c:${c}" title="${esc((j.acao||'')+(j.nf_dev?' · NF '+j.nf_dev:'')+(j.obs?' · '+j.obs:''))} – ${esc(j.quando)}"><i></i>${esc(j.status)}</span>`;
+}
+function respResumo(a){
+  const cr=a.filter(n=>CRIT.includes(n.categoria)); if(!cr.length) return '<span class="muted">–</span>';
+  const resp=cr.filter(n=>JUST[n.nf]).length, conc=cr.filter(n=>(JUST[n.nf]||{}).status==='Concluído').length;
+  return `<span title="${resp} respondidos · ${conc} concluídos de ${cr.length} casos críticos">${conc}/${cr.length}${resp>conc?` <span class="muted">(+${resp-conc})</span>`:''}</span>`;
+}
+function blocoRespostaDrawer(n){
+  const j=JUST[n.nf]; if(!j) return CRIT.includes(n.categoria)?`<h2>Resposta do vendedor</h2><div class="painel muted">Sem resposta do vendedor ainda.</div>`:'';
+  return `<h2>Resposta do vendedor</h2><div class="hist">`+(j.hist||[j]).slice().reverse().map(x=>`<div><b>${esc(x.quando)}</b> · ${esc(x.por||x.vendedor)} · <b>${esc(x.status)}</b> – ${esc(x.acao||'')}${x.nf_dev?' · NF '+esc(x.nf_dev):''}${x.obs?' · '+esc(x.obs):''}</div>`).join('')+`</div>`;
+}
+function abrirVend(v){ modoVend=v; filtroResp='todos'; fechar(); render(); window.scrollTo(0,0); }
+function sairVend(){ modoVend=null; render(); }
+function linkVend(v){
+  const base = window.WEB_URL || (D && D.web_url) || '';
+  return base ? base + (base.includes('?')?'&':'?') + 'v=' + encodeURIComponent(v) : '';
+}
+function pinSalvo(v){ try{ return localStorage.getItem('pin_'+v)||''; }catch(e){ return ''; } }
+function guardaPin(v,p){ try{ localStorage.setItem('pin_'+v,p); }catch(e){} }
+
+function cardCaso(n){
+  const st=CAT_ESTILO[n.categoria]||{}, f=formDe(n.categoria), j=JUST[n.nf], vinfo=VENDS.find(x=>x.vendedor===n.vendedor)||{};
+  const aberto = !j || window._formAberto===n.nf;
+  let h=`<div class="caso" id="caso_${esc(n.nf)}" style="--c:${st.c}">
+   <div class="ch"><div><b>NF ${esc(n.nf)}</b> · ${esc(nomeSeg(n.cliente))} · ${esc(n.portal_nome||'')}
+     <div class="muted" style="font-size:12px">Pedido ${esc(n.pedido||'—')} · Sinistro ${esc(n.sinistro||'—')} · Placa ${esc(n.placa||'—')} · Emissão ${esc(n.emissao)} · ${n.dias_atraso!=null?n.dias_atraso+' dias de atraso':''}</div></div>
+     <div style="text-align:right"><div class="v">${brl(n.saldo)}</div><div class="muted" style="font-size:12px">valor NF ${brl(n.valor)}</div></div></div>
+   <div style="margin:6px 0"><span class="tag" style="--c:${st.c}"><i></i>${esc(NOME_SUB[n.categoria]||'')}</span> ${tagResp(n)}
+     <button class="mini" data-nfdet="${esc(n.nf)}" style="margin-left:6px">Ver peças / detalhes</button></div>
+   <ul class="mots">${(n.motivos||[]).map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`;
+  if (j) h+=`<div class="ultresp"><b>Última resposta (${esc(j.quando)}):</b> ${esc(j.status)} – ${esc(j.acao||'')}${j.nf_dev?' · NF '+esc(j.nf_dev):''}${j.obs?' · '+esc(j.obs):''}
+     ${aberto?'':`<button class="mini" data-editresp="${esc(n.nf)}" style="margin-left:6px">Atualizar</button>`}</div>`;
+  if (aberto){
+    const dis = MODO_WEB ? '' : 'disabled';
+    h+=`<div class="form" data-form="${esc(n.nf)}">
+      <label>${f.titulo} – o que foi feito?<select name="acao" ${dis}><option value="">Selecione…</option>${f.acoes.map(a=>`<option ${j&&j.acao===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
+      ${f.nf?`<label>${f.nf}<input name="nf_dev" ${dis} value="${esc(j?j.nf_dev:'')}" placeholder="ex.: 1280001"></label>`:''}
+      <label class="full">Observação<textarea name="obs" rows="2" ${dis} placeholder="Explique o que aconteceu / próximo passo">${esc(j?j.obs:'')}</textarea></label>
+      <div class="full linha">
+        <label class="rd"><input type="radio" name="status_${esc(n.nf)}" value="Em andamento" ${dis} ${!j||j.status!=='Concluído'?'checked':''}> Em andamento</label>
+        <label class="rd"><input type="radio" name="status_${esc(n.nf)}" value="Concluído" ${dis} ${j&&j.status==='Concluído'?'checked':''}> Concluído</label>
+        ${vinfo.temPin?`<input name="pin" type="password" ${dis} placeholder="PIN" value="${esc(pinSalvo(n.vendedor))}" style="width:90px">`:''}
+        <span class="sp"></span>
+        ${MODO_WEB?`<button class="prim" data-salvar="${esc(n.nf)}">Salvar resposta</button>`:'<span class="muted" style="font-size:12px">Para responder, use o link web do dashboard.</span>'}
+      </div></div>`;
+  }
+  return h+`</div>`;
+}
+
+function renderVend(){
+  const v=modoVend;
+  const todos=D.cil.filter(n=>(n.vendedor||'(sem vendedor)')===v && (!fPortal.value||n.portal===fPortal.value));
+  const crit=todos.filter(n=>CRIT.includes(n.categoria)).sort((a,b)=>b.saldo-a.saldo);
+  const filtra=l=>l.filter(n=>{const j=JUST[n.nf];
+      if(filtroResp==='sem') return !j; if(filtroResp==='and') return j&&j.status!=='Concluído';
+      if(filtroResp==='conc') return j&&j.status==='Concluído'; if(filtroResp==='alerta') return concluidoMasPendente(n); return true;});
+  const okL=todos.filter(n=>n.categoria==='ok_aguardando').sort((a,b)=>b.saldo-a.saldo);
+  const outL=todos.filter(n=>!CRIT.includes(n.categoria)&&n.categoria!=='ok_aguardando');
+  const nSem=crit.filter(n=>!JUST[n.nf]).length, nAnd=crit.filter(n=>JUST[n.nf]&&JUST[n.nf].status!=='Concluído').length,
+        nConc=crit.filter(n=>(JUST[n.nf]||{}).status==='Concluído').length, nAl=crit.filter(concluidoMasPendente).length;
+  const nome=(VENDS.find(x=>x.vendedor===v)||{}).nome;
+  const lk=linkVend(v);
+  let h=`<div class="vtop">${window.VEND_INICIAL?'':'<button id="voltarvend">← Todos os vendedores</button>'}
+     <h2 style="margin:0;font-size:20px;text-transform:none;color:var(--ink)">${esc(nome||v)} <span class="muted" style="font-size:13px">${nome?esc(v):''}</span></h2><span class="sp"></span>
+     ${lk&&!window.VEND_INICIAL?`<button class="mini" data-copiar="${esc(lk)}">Copiar link deste vendedor</button>`:''}
+     <button class="mini" data-xvend="${esc(v)}">⤓ Excel</button></div>
+   <div class="kpis">
+     <div class="kpi"><div class="l">Saldo em aberto</div><div class="v">${brl(soma(todos,'saldo'))}</div><div class="s">${todos.length} NFs</div></div>
+     <div class="kpi"><div class="l">Casos para resolver</div><div class="v" style="color:var(--critical)">${crit.length}</div><div class="s">${brl(soma(crit,'saldo'))}</div></div>
+     <div class="kpi"><div class="l">Sem resposta</div><div class="v">${nSem}</div><div class="s">${nAnd} em andamento</div></div>
+     <div class="kpi"><div class="l">Concluídos</div><div class="v" style="color:var(--good-ink)">${nConc}</div><div class="s">${nAl?`<span class="vermelho">${nAl} ainda pendente(s) no portal</span>`:'conferidos pelo robô na próxima rodada'}</div></div>
+     <div class="kpi"><div class="l">OK – aguardando seguradora</div><div class="v">${okL.length}</div><div class="s">${brl(soma(okL,'saldo'))}</div></div>
+   </div>
+   <div class="chips" style="margin-bottom:12px">${[['todos','Todos',crit.length],['sem','Sem resposta',nSem],['and','Em andamento',nAnd],['conc','Concluídos',nConc],['alerta','Concluído mas portal pendente',nAl]]
+      .map(([k,t,q])=>`<span class="chip ${filtroResp===k?'ativo':''}" data-fresp="${k}">${t} <b>${q}</b></span>`).join('')}</div>`;
+  h+=`<h2>Casos para você resolver</h2>`;
+  const lc=filtra(crit);
+  h+= lc.length? lc.map(cardCaso).join('') : `<div class="painel vazio-msg">Nenhum caso nesta seleção. 👏</div>`;
+  if (okL.length) h+=`<h2>OK no portal – aguardando pagamento da seguradora (${okL.length})</h2>`+tabela(okL);
+  if (outL.length) h+=`<h2>Outros (${outL.length})</h2>`+tabela(outL);
+  app.innerHTML=h;
+}
+
+function salvarResp(nf){
+  const n=D.cil.find(x=>x.nf===nf), box=document.querySelector(`[data-form="${CSS.escape(nf)}"]`);
+  const g=nm=>{const el=box.querySelector(`[name="${nm}"]`); return el?el.value.trim():'';};
+  const status=(box.querySelector(`input[name="status_${CSS.escape(nf)}"]:checked`)||{}).value;
+  const r={nf, vendedor:n.vendedor, portal:n.portal_nome||n.portal, seguradora:n.cliente, categoria:NOME_SUB[n.categoria]||n.categoria,
+           acao:g('acao'), nf_dev:g('nf_dev'), obs:g('obs'), status, pin:g('pin')};
+  if(!r.acao){ alert('Selecione o que foi feito.'); return; }
+  if(r.status==='Concluído' && formDe(n.categoria).nf && /devolu/i.test(r.acao) && /emitida/i.test(r.acao) && !r.nf_dev){ alert('Informe o número da NF de devolução.'); return; }
+  const bt=box.querySelector('[data-salvar]'); bt.disabled=true; bt.textContent='Salvando…';
+  BACK.salvar(r).then(j=>{ JUST[nf]=j; if(r.pin) guardaPin(n.vendedor,r.pin); window._formAberto=null; render();
+      const el=document.getElementById('caso_'+nf); if(el){ el.scrollIntoView({block:'center'}); el.classList.add('ok'); setTimeout(()=>el.classList.remove('ok'),1500);} })
+    .catch(e=>{ alert(e.message||e); bt.disabled=false; bt.textContent='Salvar resposta'; });
+}
+
+document.addEventListener('click',e=>{
+  const t=e.target;
+  if(t.id==='voltarvend'){ sairVend(); return; }
+  const sv=t.closest('[data-salvar]'); if(sv){ salvarResp(sv.dataset.salvar); return; }
+  const ed=t.closest('[data-editresp]'); if(ed){ window._formAberto=ed.dataset.editresp; render(); return; }
+  const fr=t.closest('[data-fresp]'); if(fr){ filtroResp=fr.dataset.fresp; render(); return; }
+  const nd=t.closest('[data-nfdet]'); if(nd){ detalhe(nd.dataset.nfdet); return; }
+  const cp=t.closest('[data-copiar]'); if(cp){ const s=cp.dataset.copiar; (navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>{cp.textContent='Link copiado!';},()=>prompt('Copie o link:',s)); return; }
+});
+
+function carregarJustJSONP(){
+  if(!D.web_url) return;
+  window.__just = o => { JUST=o.just||{}; render(); };
+  const s=document.createElement('script'); s.src=D.web_url+(D.web_url.includes('?')?'&':'?')+'acao=just&cb=__just&t='+Date.now();
+  s.onerror=()=>{}; document.head.appendChild(s);
+}
+function iniciar(){
+  if (window.VEND_INICIAL){ ['fVend','fSeg','btnArq'].forEach(id=>{const e=document.getElementById(id); if(e) e.style.display='none';}); }
+  const vIni = window.VEND_INICIAL || decodeURIComponent(((location.hash||'').match(/v=([^&]+)/)||[])[1]||'');
+  if (MODO_WEB){
+    app.innerHTML='<div class="vazio-msg">Carregando…</div>';
+    BACK.carregar().then(o=>{ JUST=o.just||{}; VENDS=o.vendedores||[];
+        if(!o.dados){ app.innerHTML='<div class="vazio-msg">Ainda não há dados. Rode o robô no computador do gestor.</div>'; return; }
+        carregar(o.dados); if(vIni){ modoVend=vIni; render(); } })
+      .catch(e=>{ app.innerHTML='<div class="vazio-msg">Erro ao carregar: '+esc(e.message||e)+'</div>'; });
+  } else if (window.DADOS_CILIA){
+    carregar(window.DADOS_CILIA); carregarJustJSONP();
+    if(vIni){ modoVend=vIni; render(); }
+  }
+}
+
+iniciar();
+</script>
+</body>
+</html>

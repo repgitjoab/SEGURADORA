@@ -140,6 +140,14 @@ td.mot{white-space:normal;min-width:280px;max-width:460px;color:var(--ink2);font
 pre{white-space:pre-wrap;font-size:12px;background:var(--card);border:1px solid var(--ring);border-radius:10px;padding:10px;max-height:220px;overflow:auto}
 .vazio-msg{padding:40px;text-align:center;color:var(--muted)}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--page);padding:6px 10px;border-radius:6px;font-size:12px;display:none;z-index:30;font-variant-numeric:tabular-nums}
+.abas{display:flex;gap:6px;margin:0 0 16px;flex-wrap:wrap;border-bottom:1px solid var(--grid)}
+.aba{border:1px solid transparent;border-bottom:0;background:none;padding:8px 14px;border-radius:8px 8px 0 0;cursor:pointer;font:inherit;color:var(--ink2)}
+.aba.on{background:var(--card);border-color:var(--grid);color:var(--ink);font-weight:600;margin-bottom:-1px}
+.segbox{background:var(--card);border:1px solid var(--ring);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.form .pergunta{display:flex;align-items:center;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--ink)}
+.form .campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 12px}
+.form .chk{font-weight:600;color:var(--good-ink)}
+.form button[disabled]{opacity:.5;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -212,8 +220,9 @@ pre{white-space:pre-wrap;font-size:12px;background:var(--card);border:1px solid 
         if (h === (META.pin_gestor_hash || '#')) por = 'GESTOR';
         else if (h !== v.pin_hash) throw new Error('PIN incorreto para ' + r.vendedor + '.');
       }
-      if (!r.status) throw new Error('Informe a situação (Em andamento ou Concluído).');
-      const reg = {quando: agora(), status: r.status, acao: r.acao || '', nf_dev: r.nf_dev || '', obs: r.obs || '',
+      if (!r.resp && !r.status) throw new Error('Responda a pergunta do caso.');
+      const reg = {quando: agora(), status: r.status || '', acao: r.acao || '', nf_dev: r.nf_dev || '', obs: r.obs || '',
+                   fluxo: r.fluxo || '', resp: r.resp || '', campos: r.campos || {},
                    vendedor: r.vendedor || '', portal: r.portal || '', seguradora: r.seguradora || '',
                    categoria: r.categoria || '', por};
       const FV = firebase.firestore.FieldValue;
@@ -291,12 +300,14 @@ function soma(a,k){return a.reduce((s,n)=>s+(n[k]||0),0)}
 
 function render(){
   if (modoVend) return renderVend();
+  if (aba==='cobranca') return renderCobranca();
+  if (aba==='baixa') return renderBaixa();
   const base=filtradas(true);
   const conf=base.filter(n=>n.confirmado);
   const app=document.getElementById('app');
   const porCat={}; Object.keys(D.categorias).forEach(k=>porCat[k]=base.filter(n=>n.categoria===k));
   const vencidas=base.filter(n=>(n.dias_atraso||0)>0);
-  let h=`<div class="kpis">
+  let h=abasTopo()+`<div class="kpis">
     <div class="kpi"><div class="l">Saldo em aberto (portais)</div><div class="v">${brl(soma(base,'saldo'))}</div><div class="s">${base.length} NFs · ${new Set(base.map(n=>n.pedido_base)).size} pedidos</div></div>
     <div class="kpi"><div class="l">Devolução não lançada no sistema</div><div class="v">${brl(soma(porCat.dev_pendente,'saldo'))}</div><div class="s">${porCat.dev_pendente.length} NFs</div></div>
     <div class="kpi"><div class="l">OK – só falta a seguradora pagar</div><div class="v">${brl(soma(porCat.ok_aguardando,'saldo'))}</div><div class="s">${porCat.ok_aguardando.length} NFs</div></div>
@@ -522,38 +533,78 @@ function gsBack(){
 const BACK = window.BACK || ((typeof google!=='undefined' && google.script && google.script.run) ? gsBack() : null);
 const MODO_WEB = !!BACK;
 const CRIT = ['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','nf_nao_anexada','entrega_pendente'];
-const FORMS = {
-  dev: {cats:['dev_pendente','dev_nf_cilia','dev_divergente'], titulo:'Devolução',
-        acoes:['NF de devolução emitida e anexada no portal','NF de devolução emitida – falta anexar no portal',
-               'Devolução solicitada ao faturamento (aguardando NF)','Peça não foi devolvida – contestar no portal',
-               'Devolução já baixada no financeiro','Outro'], nf:'Nº da NF de devolução'},
-  nf:  {cats:['nf_nao_anexada'], titulo:'Nota não inserida',
-        acoes:['NF inserida no portal','NF emitida por engano – cancelada/devolvida','NF pertence a outro pedido (informar na observação)','Outro'], nf:'Nº NF (se mudou)'},
-  val: {cats:['valor_incorreto'], titulo:'Valor incorreto',
-        acoes:['Carta de correção enviada','NF complementar emitida','NF cancelada e reemitida','Valor contestado com a seguradora','Outro'], nf:'Nº da nova NF'},
-  ent: {cats:['entrega_pendente'], titulo:'Entrega',
-        acoes:['Baixa de entrega feita no portal','Peça ainda não entregue','Outro'], nf:''},
-  out: {cats:['ok_aguardando','nao_localizado','nao_consultado'], titulo:'Outros',
-        acoes:['Cobrança feita com a seguradora','Pedido localizado no portal (informar na observação)','Outro'], nf:''},
+// ---------------------------------------------------------------------------------------------
+// Formulário simples do vendedor: 1 pergunta Sim/Não + poucos campos. Não existe "Concluído":
+// o caso some sozinho quando a NF sair da planilha de pendências (financeiro baixou).
+// Cada resposta vira uma "situação":
+//   acao      = vendedor ainda precisa fazer algo
+//   aguarda   = vendedor fez a parte dele (coleta pedida / NF anexada) – aguardando chegada ou o robô
+//   baixa     = mercadoria chegou – aguardando BAIXA do financeiro (gestor cobra o financeiro)
+// ---------------------------------------------------------------------------------------------
+const FLUXOS = {
+  dev: {cats:['dev_pendente','dev_divergente'], pergunta:'Solicitou a coleta das peças?',
+    sim:{campos:[['transportadora','Transportadora','text','ex.: Jadlog / motoboy da loja'],['nf_retorno','Nº da NF de retorno','text','ex.: 1280001'],['previsao','Previsão de chegada','date']],
+         chk:['chegou','Mercadoria já chegou na loja (aguardando baixa do financeiro)']},
+    nao:{campos:[['motivo','Por quê?','select',['Vou solicitar agora','Peça não saiu da loja / não foi entregue','Oficina não quer devolver','Peça foi usada – tratar com a seguradora','Outro']]]}},
+  devnf: {cats:['dev_nf_cilia'], pergunta:'Anexou a NF de devolução no portal?',
+    sim:{campos:[['nf_retorno','Nº da NF de devolução','text','ex.: 1280001']]},
+    nao:{campos:[['motivo','Por quê?','select',['Vou anexar','Ainda não tenho a NF de devolução','Portal não deixa anexar','Outro']]]}},
+  nf: {cats:['nf_nao_anexada'], pergunta:'Inseriu a NF no portal?',
+    sim:{campos:[]},
+    nao:{campos:[['motivo','Por quê?','select',['Vou inserir','NF emitida por engano – vou cancelar/devolver','NF é de outro pedido','Portal não aceita a NF','Outro']]]}},
+  val: {cats:['valor_incorreto'], pergunta:'Já corrigiu o valor da nota?',
+    sim:{campos:[['como','Como?','select',['Carta de correção','NF complementar','Cancelei e emiti nova NF','Valor está certo – ajustado no portal']],['nf_nova','Nº da nova NF (se houver)','text','']]},
+    nao:{campos:[['motivo','Por quê?','select',['Vou corrigir','Aguardando seguradora / regulador','Outro']]]}},
+  ent: {cats:['entrega_pendente'], pergunta:'Deu baixa da entrega no portal?',
+    sim:{campos:[]},
+    nao:{campos:[['motivo','Por quê?','select',['Peça ainda não foi entregue','Portal não deixa dar baixa','Outro']],['previsao','Previsão de entrega','date']]}},
 };
-function formDe(cat){ return Object.values(FORMS).find(f=>f.cats.includes(cat)) || FORMS.out; }
+function fluxoDe(cat){ return Object.entries(FLUXOS).find(([k,f])=>f.cats.includes(cat)); }
 function dataNum(s){ const m=/(\d+)\/(\d+)\/(\d+)\s*(\d+)?:?(\d+)?/.exec(s||''); return m? +(m[3]+m[2].padStart(2,'0')+m[1].padStart(2,'0')+(m[4]||'00').padStart(2,'0')+(m[5]||'00').padStart(2,'0')) : 0; }
-// concluído pelo vendedor, mas o robô (rodado depois) ainda vê a pendência
-function concluidoMasPendente(n){ const j=JUST[n.nf]; return j && j.status==='Concluído' && CRIT.includes(n.categoria) && D && dataNum(D.gerado_em) > dataNum(j.quando); }
+function hojeISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtData(iso){ const m=/(\d{4})-(\d\d)-(\d\d)/.exec(iso||''); return m?`${m[3]}/${m[2]}/${m[1]}`:(iso||''); }
+// situação de uma resposta: {cod, txt, cor, alerta}
+function situacao(n){ return situacaoReg(JUST[n.nf]); }
+function situacaoReg(j){
+  if(!j) return null;
+  const c=j.campos||{};
+  // robô rodou depois da resposta e ainda vê a mesma pendência?
+  const roboDepois = D && dataNum(D.gerado_em) > dataNum(j.quando);
+  if (!j.fluxo){   // resposta no formato antigo
+    return {cod:'acao', txt:(j.status||'Respondido')+(j.acao?' – '+j.acao:''), cor:'var(--info)'};
+  }
+  if (j.resp==='nao') return {cod:'acao', txt:'Pendente: '+(c.motivo||'sem motivo')+(c.previsao?' · previsão '+fmtData(c.previsao):''), cor:'var(--serious)',
+                              alerta: c.previsao && c.previsao<hojeISO() ? 'Previsão vencida' : ''};
+  if (j.fluxo==='dev'){
+    if (c.chegou) return {cod:'baixa', txt:'Mercadoria chegou – aguardando baixa do financeiro', cor:'var(--good)'};
+    const venc = c.previsao && c.previsao<hojeISO();
+    return {cod:'aguarda', txt:'Coleta solicitada'+(c.transportadora?' · '+c.transportadora:'')+(c.nf_retorno?' · NF retorno '+c.nf_retorno:'')+(c.previsao?' · chega '+fmtData(c.previsao):''),
+            cor:venc?'var(--warning)':'var(--info)', alerta: venc?'Previsão de chegada vencida':''};
+  }
+  const feito = {devnf:'NF de devolução anexada'+(c.nf_retorno?' ('+c.nf_retorno+')':''), nf:'NF inserida no portal',
+                 val:'Valor corrigido'+(c.como?' – '+c.como:'')+(c.nf_nova?' · NF '+c.nf_nova:''), ent:'Baixa de entrega feita'}[j.fluxo]||'Feito';
+  return {cod:'aguarda', txt:feito+' – aguardando o robô confirmar', cor:roboDepois?'var(--warning)':'var(--info)',
+          alerta: roboDepois ? 'Robô rodou depois e o portal ainda mostra pendente' : ''};
+}
 function tagResp(n){
-  const j=JUST[n.nf]; if(!j) return CRIT.includes(n.categoria)?'<span class="muted" style="font-size:12px">sem resposta</span>':'';
-  if (concluidoMasPendente(n)) return `<span class="tag" style="--c:var(--warning)" title="${esc(j.acao||'')} – ${esc(j.quando)}"><i></i>Concluído · portal ainda pendente</span>`;
-  const c = j.status==='Concluído' ? 'var(--good)' : 'var(--info)';
-  return `<span class="tag" style="--c:${c}" title="${esc((j.acao||'')+(j.nf_dev?' · NF '+j.nf_dev:'')+(j.obs?' · '+j.obs:''))} – ${esc(j.quando)}"><i></i>${esc(j.status)}</span>`;
+  const s=situacao(n);
+  if(!s) return CRIT.includes(n.categoria)?'<span class="muted" style="font-size:12px">sem resposta</span>':'';
+  const j=JUST[n.nf];
+  return `<span class="tag" style="--c:${s.alerta?'var(--warning)':s.cor}" title="${esc(s.txt+(j.obs?' · '+j.obs:'')+' – '+j.quando+' · '+(j.por||''))}"><i></i>${esc(s.alerta?'⚠ '+s.alerta:s.txt.length>46?s.txt.slice(0,44)+'…':s.txt)}</span>`;
 }
 function respResumo(a){
   const cr=a.filter(n=>CRIT.includes(n.categoria)); if(!cr.length) return '<span class="muted">–</span>';
-  const resp=cr.filter(n=>JUST[n.nf]).length, conc=cr.filter(n=>(JUST[n.nf]||{}).status==='Concluído').length;
-  return `<span title="${resp} respondidos · ${conc} concluídos de ${cr.length} casos críticos">${conc}/${cr.length}${resp>conc?` <span class="muted">(+${resp-conc})</span>`:''}</span>`;
+  const resp=cr.filter(n=>JUST[n.nf]).length, feitos=cr.filter(n=>{const s=situacao(n); return s&&s.cod!=='acao';}).length;
+  return `<span title="${resp} de ${cr.length} casos respondidos · ${feitos} com a parte do vendedor feita">${resp}/${cr.length}</span>`;
+}
+function textoResposta(x){
+  const c=x.campos||{};
+  if(!x.fluxo) return `${esc(x.status||'')} – ${esc(x.acao||'')}${x.nf_dev?' · NF '+esc(x.nf_dev):''}`;
+  return `<b>${x.resp==='sim'?'Sim':'Não'}</b>`+Object.entries(c).filter(([k,v])=>v).map(([k,v])=>' · '+esc(k==='chegou'?'mercadoria chegou':(k==='previsao'?'previsão '+fmtData(v):v))).join('');
 }
 function blocoRespostaDrawer(n){
   const j=JUST[n.nf]; if(!j) return CRIT.includes(n.categoria)?`<h2>Resposta do vendedor</h2><div class="painel muted">Sem resposta do vendedor ainda.</div>`:'';
-  return `<h2>Resposta do vendedor</h2><div class="hist">`+(j.hist||[j]).slice().reverse().map(x=>`<div><b>${esc(x.quando)}</b> · ${esc(x.por||x.vendedor)} · <b>${esc(x.status)}</b> – ${esc(x.acao||'')}${x.nf_dev?' · NF '+esc(x.nf_dev):''}${x.obs?' · '+esc(x.obs):''}</div>`).join('')+`</div>`;
+  return `<h2>Resposta do vendedor</h2><div class="hist">`+(j.hist||[j]).slice().reverse().map(x=>`<div><b>${esc(x.quando)}</b> · ${esc(x.por||x.vendedor)} · ${textoResposta(x)}${x.obs?' · '+esc(x.obs):''}</div>`).join('')+`</div>`;
 }
 function abrirVend(v){ modoVend=v; filtroResp='todos'; fechar(); render(); window.scrollTo(0,0); }
 function sairVend(){ modoVend=null; render(); }
@@ -561,49 +612,59 @@ function linkVend(v){
   const base = window.WEB_URL || (D && D.web_url) || '';
   return base ? base + (base.includes('?')?'&':'?') + 'v=' + encodeURIComponent(v) : '';
 }
-function pinSalvo(v){ try{ return localStorage.getItem('pin_'+v)||''; }catch(e){ return ''; } }
-function guardaPin(v,p){ try{ localStorage.setItem('pin_'+v,p); }catch(e){} }
 
+function campoHTML(nf,[nome,rot,tipo,extra],val,dis){
+  if(tipo==='select') return `<label>${rot}<select name="${nome}" ${dis}><option value="">Selecione…</option>${extra.map(o=>`<option ${val===o?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  return `<label>${rot}<input name="${nome}" type="${tipo}" ${dis} value="${esc(val||'')}" placeholder="${esc(extra||'')}"></label>`;
+}
+function formCaso(n){
+  const fx=fluxoDe(n.categoria); if(!fx) return '';
+  const [fk,f]=fx, j=JUST[n.nf], prev=(j&&j.fluxo===fk)?j:null, c=(prev&&prev.campos)||{};
+  const dis = MODO_WEB ? '' : 'disabled';
+  const resp = (window._resp||{})[n.nf] || (prev&&prev.resp) || '';
+  let h=`<div class="form" data-form="${esc(n.nf)}" data-fluxo="${fk}">
+    <div class="full pergunta"><b>${esc(f.pergunta)}</b>
+      <label class="rd"><input type="radio" name="resp_${esc(n.nf)}" value="sim" data-resp="${esc(n.nf)}" ${dis} ${resp==='sim'?'checked':''}> Sim</label>
+      <label class="rd"><input type="radio" name="resp_${esc(n.nf)}" value="nao" data-resp="${esc(n.nf)}" ${dis} ${resp==='nao'?'checked':''}> Não</label></div>`;
+  if(resp){
+    const o=f[resp];
+    h+=`<div class="full campos">`+o.campos.map(cp=>campoHTML(n.nf,cp,c[cp[0]],dis)).join('')+`</div>`;
+    if(o.chk) h+=`<label class="full rd chk"><input type="checkbox" name="${o.chk[0]}" ${dis} ${c[o.chk[0]]?'checked':''}> ${esc(o.chk[1])}</label>`;
+  }
+  h+=`<label class="full">Observação (opcional)<textarea name="obs" rows="1" ${dis} placeholder="Algo que o gestor precise saber">${esc(prev?prev.obs:'')}</textarea></label>
+    <div class="full linha"><span class="sp"></span>
+      ${MODO_WEB?`${j?`<button class="mini" data-cancelaresp="${esc(n.nf)}">Cancelar</button>`:''}<button class="prim" data-salvar="${esc(n.nf)}" ${resp?'':'disabled'}>Salvar</button>`:'<span class="muted" style="font-size:12px">Para responder, use o link web do dashboard.</span>'}
+    </div></div>`;
+  return h;
+}
 function cardCaso(n){
-  const st=CAT_ESTILO[n.categoria]||{}, f=formDe(n.categoria), j=JUST[n.nf], vinfo=VENDS.find(x=>x.vendedor===n.vendedor)||{};
+  const st=CAT_ESTILO[n.categoria]||{}, j=JUST[n.nf], s=situacao(n);
   const aberto = !j || window._formAberto===n.nf;
   let h=`<div class="caso" id="caso_${esc(n.nf)}" style="--c:${st.c}">
    <div class="ch"><div><b>NF ${esc(n.nf)}</b> · ${esc(nomeSeg(n.cliente))} · ${esc(n.portal_nome||'')}
      <div class="muted" style="font-size:12px">Pedido ${esc(n.pedido||'—')} · Sinistro ${esc(n.sinistro||'—')} · Placa ${esc(n.placa||'—')} · Emissão ${esc(n.emissao)} · ${n.dias_atraso!=null?n.dias_atraso+' dias de atraso':''}</div></div>
      <div style="text-align:right"><div class="v">${brl(n.saldo)}</div><div class="muted" style="font-size:12px">valor NF ${brl(n.valor)}</div></div></div>
-   <div style="margin:6px 0"><span class="tag" style="--c:${st.c}"><i></i>${esc(NOME_SUB[n.categoria]||'')}</span> ${tagResp(n)}
+   <div style="margin:6px 0"><span class="tag" style="--c:${st.c}"><i></i>${esc(NOME_SUB[n.categoria]||'')}</span>
      <button class="mini" data-nfdet="${esc(n.nf)}" style="margin-left:6px">Ver peças / detalhes</button></div>
    <ul class="mots">${(n.motivos||[]).map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`;
-  if (j) h+=`<div class="ultresp"><b>Última resposta (${esc(j.quando)}):</b> ${esc(j.status)} – ${esc(j.acao||'')}${j.nf_dev?' · NF '+esc(j.nf_dev):''}${j.obs?' · '+esc(j.obs):''}
-     ${aberto?'':`<button class="mini" data-editresp="${esc(n.nf)}" style="margin-left:6px">Atualizar</button>`}</div>`;
-  if (aberto){
-    const dis = MODO_WEB ? '' : 'disabled';
-    h+=`<div class="form" data-form="${esc(n.nf)}">
-      <label>${f.titulo} – o que foi feito?<select name="acao" ${dis}><option value="">Selecione…</option>${f.acoes.map(a=>`<option ${j&&j.acao===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
-      ${f.nf?`<label>${f.nf}<input name="nf_dev" ${dis} value="${esc(j?j.nf_dev:'')}" placeholder="ex.: 1280001"></label>`:''}
-      <label class="full">Observação<textarea name="obs" rows="2" ${dis} placeholder="Explique o que aconteceu / próximo passo">${esc(j?j.obs:'')}</textarea></label>
-      <div class="full linha">
-        <label class="rd"><input type="radio" name="status_${esc(n.nf)}" value="Em andamento" ${dis} ${!j||j.status!=='Concluído'?'checked':''}> Em andamento</label>
-        <label class="rd"><input type="radio" name="status_${esc(n.nf)}" value="Concluído" ${dis} ${j&&j.status==='Concluído'?'checked':''}> Concluído</label>
-        ${vinfo.temPin?`<input name="pin" type="password" ${dis} placeholder="PIN" value="${esc(pinSalvo(n.vendedor))}" style="width:90px">`:''}
-        <span class="sp"></span>
-        ${MODO_WEB?`<button class="prim" data-salvar="${esc(n.nf)}">Salvar resposta</button>`:'<span class="muted" style="font-size:12px">Para responder, use o link web do dashboard.</span>'}
-      </div></div>`;
-  }
+  if (j && s) h+=`<div class="ultresp" style="--c:${s.alerta?'var(--warning)':s.cor}"><span class="tag" style="--c:${s.alerta?'var(--warning)':s.cor}"><i></i>${esc(s.txt)}</span>
+       ${s.alerta?`<b class="vermelho"> ⚠ ${esc(s.alerta)}</b>`:''}${j.obs?` <span class="muted">· ${esc(j.obs)}</span>`:''}
+       <span class="muted" style="font-size:12px"> · ${esc(j.quando)}</span>
+     ${aberto?'':`<button class="mini" data-editresp="${esc(n.nf)}" style="margin-left:6px">${s.cod==='aguarda'&&j.fluxo==='dev'?'Atualizar / mercadoria chegou':'Atualizar'}</button>`}</div>`;
+  if (aberto) h+=formCaso(n);
   return h+`</div>`;
 }
 
+const FILTROS_V = [['todos','Todos'],['sem','Sem resposta'],['acao','Pendente comigo'],['aguarda','Aguardando chegada / robô'],['baixa','Aguardando baixa financeiro'],['alerta','⚠ Atenção']];
+function filtroCaso(n,k){ const s=situacao(n);
+  if(k==='todos') return true; if(k==='sem') return !s; if(k==='alerta') return !!(s&&s.alerta); return !!s && s.cod===k; }
 function renderVend(){
   const v=modoVend;
   const todos=D.cil.filter(n=>(n.vendedor||'(sem vendedor)')===v && (!fPortal.value||n.portal===fPortal.value));
-  const crit=todos.filter(n=>CRIT.includes(n.categoria)).sort((a,b)=>b.saldo-a.saldo);
-  const filtra=l=>l.filter(n=>{const j=JUST[n.nf];
-      if(filtroResp==='sem') return !j; if(filtroResp==='and') return j&&j.status!=='Concluído';
-      if(filtroResp==='conc') return j&&j.status==='Concluído'; if(filtroResp==='alerta') return concluidoMasPendente(n); return true;});
+  const crit=todos.filter(n=>CRIT.includes(n.categoria)).sort((a,b)=>(!!JUST[a.nf])-(!!JUST[b.nf])||b.saldo-a.saldo);
   const okL=todos.filter(n=>n.categoria==='ok_aguardando').sort((a,b)=>b.saldo-a.saldo);
   const outL=todos.filter(n=>!CRIT.includes(n.categoria)&&n.categoria!=='ok_aguardando');
-  const nSem=crit.filter(n=>!JUST[n.nf]).length, nAnd=crit.filter(n=>JUST[n.nf]&&JUST[n.nf].status!=='Concluído').length,
-        nConc=crit.filter(n=>(JUST[n.nf]||{}).status==='Concluído').length, nAl=crit.filter(concluidoMasPendente).length;
+  const q=k=>crit.filter(n=>filtroCaso(n,k)).length;
   const nome=(VENDS.find(x=>x.vendedor===v)||{}).nome;
   const lk=linkVend(v);
   let h=`<div class="vtop">${window.VEND_INICIAL?'':'<button id="voltarvend">← Todos os vendedores</button>'}
@@ -613,14 +674,14 @@ function renderVend(){
    <div class="kpis">
      <div class="kpi"><div class="l">Saldo em aberto</div><div class="v">${brl(soma(todos,'saldo'))}</div><div class="s">${todos.length} NFs</div></div>
      <div class="kpi"><div class="l">Casos para resolver</div><div class="v" style="color:var(--critical)">${crit.length}</div><div class="s">${brl(soma(crit,'saldo'))}</div></div>
-     <div class="kpi"><div class="l">Sem resposta</div><div class="v">${nSem}</div><div class="s">${nAnd} em andamento</div></div>
-     <div class="kpi"><div class="l">Concluídos</div><div class="v" style="color:var(--good-ink)">${nConc}</div><div class="s">${nAl?`<span class="vermelho">${nAl} ainda pendente(s) no portal</span>`:'conferidos pelo robô na próxima rodada'}</div></div>
+     <div class="kpi"><div class="l">Sem resposta</div><div class="v">${q('sem')}</div><div class="s">${q('acao')} pendente(s) com você</div></div>
+     <div class="kpi"><div class="l">Sua parte feita</div><div class="v" style="color:var(--good-ink)">${q('aguarda')+q('baixa')}</div><div class="s">${q('baixa')} aguardando baixa do financeiro</div></div>
      <div class="kpi"><div class="l">OK – aguardando seguradora</div><div class="v">${okL.length}</div><div class="s">${brl(soma(okL,'saldo'))}</div></div>
    </div>
-   <div class="chips" style="margin-bottom:12px">${[['todos','Todos',crit.length],['sem','Sem resposta',nSem],['and','Em andamento',nAnd],['conc','Concluídos',nConc],['alerta','Concluído mas portal pendente',nAl]]
-      .map(([k,t,q])=>`<span class="chip ${filtroResp===k?'ativo':''}" data-fresp="${k}">${t} <b>${q}</b></span>`).join('')}</div>`;
+   <div class="painel muted" style="font-size:12px;margin-bottom:12px">Responda cada caso. Não precisa concluir: o caso sai daqui sozinho quando o financeiro der baixa (NF some da planilha de pendências) ou quando o robô vir que o portal ficou certo.</div>
+   <div class="chips" style="margin-bottom:12px">${FILTROS_V.map(([k,t])=>`<span class="chip ${filtroResp===k?'ativo':''}" data-fresp="${k}">${t} <b>${q(k)}</b></span>`).join('')}</div>`;
   h+=`<h2>Casos para você resolver</h2>`;
-  const lc=filtra(crit);
+  const lc=crit.filter(n=>filtroCaso(n,filtroResp));
   h+= lc.length? lc.map(cardCaso).join('') : `<div class="painel vazio-msg">Nenhum caso nesta seleção. 👏</div>`;
   if (okL.length) h+=`<h2>OK no portal – aguardando pagamento da seguradora (${okL.length})</h2>`+tabela(okL);
   if (outL.length) h+=`<h2>Outros (${outL.length})</h2>`+tabela(outL);
@@ -629,22 +690,126 @@ function renderVend(){
 
 function salvarResp(nf){
   const n=D.cil.find(x=>x.nf===nf), box=document.querySelector(`[data-form="${CSS.escape(nf)}"]`);
-  const g=nm=>{const el=box.querySelector(`[name="${nm}"]`); return el?el.value.trim():'';};
-  const status=(box.querySelector(`input[name="status_${CSS.escape(nf)}"]:checked`)||{}).value;
+  const fk=box.dataset.fluxo, f=FLUXOS[fk];
+  const resp=(box.querySelector(`input[name="resp_${CSS.escape(nf)}"]:checked`)||{}).value;
+  if(!resp){ alert('Responda: '+f.pergunta); return; }
+  const o=f[resp], campos={};
+  o.campos.forEach(([nome])=>{const el=box.querySelector(`[name="${nome}"]`); campos[nome]=el?el.value.trim():'';});
+  if(o.chk){ const el=box.querySelector(`[name="${o.chk[0]}"]`); campos[o.chk[0]]=!!(el&&el.checked); }
+  if(campos.motivo==='' ){ alert('Selecione o motivo.'); return; }
+  if(fk==='dev' && resp==='sim' && !campos.chegou && !campos.nf_retorno && !campos.transportadora){ alert('Informe a transportadora ou o nº da NF de retorno.'); return; }
+  if(fk==='devnf' && resp==='sim' && !campos.nf_retorno){ alert('Informe o nº da NF de devolução.'); return; }
+  const obs=(box.querySelector('[name="obs"]')||{}).value||'';
   const r={nf, vendedor:n.vendedor, portal:n.portal_nome||n.portal, seguradora:n.cliente, categoria:NOME_SUB[n.categoria]||n.categoria,
-           acao:g('acao'), nf_dev:g('nf_dev'), obs:g('obs'), status, pin:g('pin')};
-  if(!r.acao){ alert('Selecione o que foi feito.'); return; }
-  if(r.status==='Concluído' && formDe(n.categoria).nf && /devolu/i.test(r.acao) && /emitida/i.test(r.acao) && !r.nf_dev){ alert('Informe o número da NF de devolução.'); return; }
+           fluxo:fk, resp, campos, obs:obs.trim(), nf_dev:campos.nf_retorno||campos.nf_nova||''};
+  r.status=(situacaoReg({...r, quando:'99/99/9999'})||{}).txt||'Respondido';
+  r.acao=f.pergunta+' '+(resp==='sim'?'Sim':'Não');
   const bt=box.querySelector('[data-salvar]'); bt.disabled=true; bt.textContent='Salvando…';
-  BACK.salvar(r).then(j=>{ JUST[nf]=j; if(r.pin) guardaPin(n.vendedor,r.pin); window._formAberto=null; render();
+  BACK.salvar(r).then(j=>{ JUST[nf]=j; window._formAberto=null; if(window._resp) delete window._resp[nf]; render();
       const el=document.getElementById('caso_'+nf); if(el){ el.scrollIntoView({block:'center'}); el.classList.add('ok'); setTimeout(()=>el.classList.remove('ok'),1500);} })
-    .catch(e=>{ alert(e.message||e); bt.disabled=false; bt.textContent='Salvar resposta'; });
+    .catch(e=>{ alert(e.message||e); bt.disabled=false; bt.textContent='Salvar'; });
+}
+
+// ===================== GESTOR: COBRAR SEGURADORAS / AGUARDANDO BAIXA =====================
+function ultimaEntrega(n){
+  const it=((n.cilia||{}).itens||[]).filter(i=>i.desta_nf); let mx='';
+  it.forEach(i=>{ const d=String(i.prev_entrega||'').slice(0,10); const iso=/^\d{4}-/.test(d)?d:d.split('/').reverse().join('-'); if(iso>mx) mx=iso; });
+  return mx?fmtData(mx):'';
+}
+function linhasCobranca(l){
+  return l.map(n=>({'Seguradora':n.cliente,'CNPJ':n.cnpj,'NF':n.nf,'Emissão':n.emissao,'Vencimento':n.vencimento,'Dias de atraso':n.dias_atraso,
+    'Valor NF':n.valor,'Saldo em aberto':n.saldo,'Sinistro':n.sinistro,'Placa':n.placa,'Pedido':n.pedido,'Portal':n.portal_nome||'',
+    'NF inserida no portal':'Sim','Peças entregues':'Sim','Entrega (portal)':ultimaEntrega(n),'Oficina':(n.cilia||{}).oficina||'','Vendedor':n.vendedor}));
+}
+function okFiltradas(){ return filtradas(true).filter(n=>n.categoria==='ok_aguardando'); }
+function porSeg(l){ const o={}; l.forEach(n=>{const s=nomeSeg(n.cliente);(o[s]=o[s]||[]).push(n)}); return Object.entries(o).sort((a,b)=>soma(b[1],'saldo')-soma(a[1],'saldo')); }
+function renderCobranca(){
+  const l=okFiltradas(), grupos=porSeg(l);
+  let h=abasTopo()+`<div class="kpis">
+    <div class="kpi"><div class="l">OK – só falta a seguradora pagar</div><div class="v">${brl(soma(l,'saldo'))}</div><div class="s">${l.length} NFs · ${grupos.length} seguradoras</div></div>
+    <div class="kpi"><div class="l">Vencidas</div><div class="v">${brl(soma(l.filter(n=>n.dias_atraso>0),'saldo'))}</div><div class="s">${l.filter(n=>n.dias_atraso>0).length} NFs</div></div>
+    <div class="kpi"><div class="l">Mais de 60 dias</div><div class="v vermelho">${brl(soma(l.filter(n=>n.dias_atraso>60),'saldo'))}</div><div class="s">${l.filter(n=>n.dias_atraso>60).length} NFs</div></div></div>
+  <div class="listahdr"><h2>Notas OK no portal – cobrar a seguradora</h2><span class="sp"></span><button id="xcobtodas">⤓ Excel – todas (uma aba por seguradora)</button></div>
+  <p class="muted" style="margin:-6px 0 12px;font-size:12px">NF inserida e peças entregues no portal, sem pendência do nosso lado. Use “Copiar e-mail” para colar a tabela no e-mail para a seguradora.</p>`;
+  if(!grupos.length) h+=`<div class="painel vazio-msg">Nenhuma nota OK aguardando pagamento nesta seleção.</div>`;
+  for(const [s,a] of grupos){
+    a.sort((x,y)=>(y.dias_atraso||0)-(x.dias_atraso||0));
+    h+=`<div class="segbox"><div class="listahdr" style="margin:0 0 8px"><h2 style="margin:0">${esc(s)} — ${a.length} NFs · ${brl(soma(a,'saldo'))}</h2>
+      <span class="muted" style="font-size:12px">mais antiga: ${Math.max(...a.map(n=>n.dias_atraso||0))} dias</span><span class="sp"></span>
+      <button class="mini" data-email="${esc(s)}">✉ Copiar e-mail</button><button class="mini" data-xcob="${esc(s)}">⤓ Excel</button></div>
+      <div class="tabwrap"><table><thead><tr><th>NF</th><th>Emissão</th><th>Venc.</th><th class="num">Atraso</th><th class="num">Saldo</th><th>Sinistro</th><th>Placa</th><th>Pedido</th><th>Portal</th><th>Entrega</th><th>Vendedor</th></tr></thead><tbody>`+
+      a.map(n=>`<tr data-nf="${esc(n.nf)}"><td><b>${esc(n.nf)}</b></td><td>${esc(n.emissao)}</td><td>${esc(n.vencimento)}</td><td class="num ${n.dias_atraso>60?'vermelho':''}">${n.dias_atraso??''}</td>
+        <td class="num">${brl(n.saldo)}</td><td>${esc(n.sinistro)}</td><td>${esc(n.placa)}</td><td>${esc(n.pedido)}</td><td>${esc(n.portal_nome||'')}</td><td>${esc(ultimaEntrega(n))}</td><td>${esc(n.vendedor||'')}</td></tr>`).join('')+
+      `</tbody></table></div></div>`;
+  }
+  app.innerHTML=h;
+}
+function emailSeguradora(s){
+  const a=okFiltradas().filter(n=>nomeSeg(n.cliente)===s).sort((x,y)=>(y.dias_atraso||0)-(x.dias_atraso||0));
+  const cab=['NF','Emissão','Vencimento','Dias em atraso','Valor (R$)','Sinistro','Placa','Pedido','Portal'];
+  const lin=a.map(n=>[n.nf,n.emissao,n.vencimento,n.dias_atraso??'',(n.saldo||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),n.sinistro||'',n.placa||'',n.pedido||'',n.portal_nome||'']);
+  const intro=`Prezados,\n\nSegue relação de notas fiscais da ${s} já inseridas no portal, com as peças entregues, que constam em aberto em nosso financeiro (total ${brl(soma(a,'saldo'))}).\nPor gentileza, verificar o motivo da pendência e nos informar a previsão de pagamento de cada uma.\n\n`;
+  const fim=`\n\nFicamos à disposição.\nAtenciosamente,`;
+  const txt=intro+[cab.join('\t'),...lin.map(r=>r.join('\t'))].join('\n')+fim;
+  const td='style="border:1px solid #999;padding:3px 8px"';
+  const html=`<p>${intro.trim().replace(/\n/g,'<br>')}</p><table style="border-collapse:collapse;font-family:Calibri,Arial;font-size:10pt"><tr>${cab.map(c=>`<th ${td} bgcolor="#e8e8e8">${c}</th>`).join('')}</tr>${lin.map(r=>`<tr>${r.map(c=>`<td ${td}>${esc(c)}</td>`).join('')}</tr>`).join('')}</table><p>${fim.trim().replace(/\n/g,'<br>')}</p>`;
+  const ok=()=>alert(`E-mail da ${s} copiado (${a.length} NFs). Cole no Outlook/Gmail com Ctrl+V.`);
+  if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+    navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})]).then(ok,()=>prompt('Copie o texto:',txt));
+  } else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(ok,()=>prompt('Copie o texto:',txt)); }
+  else prompt('Copie o texto:',txt);
+}
+function exportarCobranca(s){
+  const l=okFiltradas();
+  if(s){ exportar('Cobranca_'+s,{[s]:linhasCobranca(l.filter(n=>nomeSeg(n.cliente)===s))}); return; }
+  const abas={'Resumo':porSeg(l).map(([sg,a])=>({'Seguradora':sg,'NFs':a.length,'Saldo':Math.round(soma(a,'saldo')*100)/100,'Maior atraso (dias)':Math.max(...a.map(n=>n.dias_atraso||0))}))};
+  porSeg(l).forEach(([sg,a])=>abas[sg]=linhasCobranca(a));
+  exportar('Cobranca_seguradoras',abas);
+}
+function linhasBaixa(l){
+  return l.map(n=>{const j=JUST[n.nf]||{}, c=j.campos||{}, s=situacao(n)||{};
+    return {'NF':n.nf,'Seguradora':n.cliente,'Vendedor':n.vendedor,'Portal':n.portal_nome||'','Saldo':n.saldo,'Devolvido no portal':n.valor_devolvido??'',
+      'Situação':s.txt||'','Transportadora':c.transportadora||'','NF de retorno':c.nf_retorno||'','Previsão de chegada':fmtData(c.previsao),'Atenção':s.alerta||'',
+      'Obs. vendedor':j.obs||'','Respondido em':j.quando||'','Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa};});
+}
+function renderBaixa(){
+  const base=filtradas(true).filter(n=>CRIT.includes(n.categoria));
+  const chegou=base.filter(n=>(situacao(n)||{}).cod==='baixa');
+  const coleta=base.filter(n=>{const j=JUST[n.nf]; return j&&j.fluxo==='dev'&&j.resp==='sim'&&!(j.campos||{}).chegou;});
+  const alerta=base.filter(n=>(situacao(n)||{}).alerta);
+  const semResp=base.filter(n=>!JUST[n.nf]);
+  const tb=(l)=> l.length?`<div class="tabwrap"><table><thead><tr><th>NF</th><th>Vendedor</th><th>Seguradora</th><th class="num">Saldo</th><th>Situação informada</th><th>NF retorno</th><th>Previsão</th><th>Respondido em</th><th>Obs.</th></tr></thead><tbody>`+
+    l.map(n=>{const j=JUST[n.nf]||{},c=j.campos||{},s=situacao(n)||{}; return `<tr data-nf="${esc(n.nf)}"><td><b>${esc(n.nf)}</b></td><td>${esc(n.vendedor||'')}</td><td>${esc(nomeSeg(n.cliente))}</td><td class="num">${brl(n.saldo)}</td>
+      <td>${tagResp(n)}</td><td>${esc(c.nf_retorno||c.nf_nova||'')}</td><td class="${s.alerta?'vermelho':''}">${esc(fmtData(c.previsao))}</td><td>${esc(j.quando||'')}</td><td class="mot">${esc(j.obs||'')}</td></tr>`}).join('')+`</tbody></table></div>`
+    : '<div class="painel muted">Nenhuma.</div>';
+  app.innerHTML=abasTopo()+`<div class="kpis">
+    <div class="kpi"><div class="l">Mercadoria chegou – financeiro baixar</div><div class="v" style="color:var(--good-ink)">${chegou.length}</div><div class="s">${brl(soma(chegou,'saldo'))}</div></div>
+    <div class="kpi"><div class="l">Coletas em andamento</div><div class="v">${coleta.length}</div><div class="s">${brl(soma(coleta,'saldo'))}</div></div>
+    <div class="kpi"><div class="l">⚠ Atenção</div><div class="v vermelho">${alerta.length}</div><div class="s">previsão vencida / robô ainda vê pendente</div></div>
+    <div class="kpi"><div class="l">Casos sem resposta</div><div class="v">${semResp.length}</div><div class="s">${brl(soma(semResp,'saldo'))}</div></div></div>
+   <div class="listahdr"><h2>Mercadoria chegou – cobrar baixa do financeiro (${chegou.length})</h2><span class="sp"></span><button id="xbaixa">⤓ Excel para o financeiro</button></div>${tb(chegou)}
+   <div class="listahdr"><h2>Coletas solicitadas – aguardando chegada (${coleta.length})</h2></div>${tb(coleta)}
+   <div class="listahdr"><h2>⚠ Atenção (${alerta.length})</h2></div>${tb(alerta)}`;
+}
+let aba='geral';
+function abasTopo(){
+  return `<div class="abas">${[['geral','Visão geral'],['cobranca','Cobrar seguradoras (OK)'],['baixa','Respostas dos vendedores / baixas']].map(([k,t])=>`<button class="aba ${aba===k?'on':''}" data-aba="${k}">${t}</button>`).join('')}</div>`;
 }
 
 document.addEventListener('click',e=>{
   const t=e.target;
   if(t.id==='voltarvend'){ sairVend(); return; }
+  const ab=t.closest('[data-aba]'); if(ab){ aba=ab.dataset.aba; render(); return; }
+  if(t.id==='xcobtodas'){ exportarCobranca(); return; }
+  const xc=t.closest('[data-xcob]'); if(xc){ exportarCobranca(xc.dataset.xcob); return; }
+  const em=t.closest('[data-email]'); if(em){ emailSeguradora(em.dataset.email); return; }
+  if(t.id==='xbaixa'){ const base=filtradas(true).filter(n=>CRIT.includes(n.categoria));
+     exportar('Aguardando_baixa_financeiro',{'Mercadoria chegou':linhasBaixa(base.filter(n=>(situacao(n)||{}).cod==='baixa')),
+       'Coletas em andamento':linhasBaixa(base.filter(n=>{const j=JUST[n.nf]; return j&&j.fluxo==='dev'&&j.resp==='sim'&&!(j.campos||{}).chegou;})),
+       'Todas as respostas':linhasBaixa(base.filter(n=>JUST[n.nf]))}); return; }
+  const rs=t.closest('[data-resp]'); if(rs){ window._resp=window._resp||{}; window._resp[rs.dataset.resp]=rs.value; window._formAberto=rs.dataset.resp; render(); return; }
   const sv=t.closest('[data-salvar]'); if(sv){ salvarResp(sv.dataset.salvar); return; }
+  const cr=t.closest('[data-cancelaresp]'); if(cr){ window._formAberto=null; if(window._resp) delete window._resp[cr.dataset.cancelaresp]; render(); return; }
   const ed=t.closest('[data-editresp]'); if(ed){ window._formAberto=ed.dataset.editresp; render(); return; }
   const fr=t.closest('[data-fresp]'); if(fr){ filtroResp=fr.dataset.fresp; render(); return; }
   const nd=t.closest('[data-nfdet]'); if(nd){ detalhe(nd.dataset.nfdet); return; }

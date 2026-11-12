@@ -239,21 +239,23 @@ const CAT_ESTILO = {
   dev_nf_cilia:     {c:'var(--serious)',  i:'⇄', dk:false, d:'Devolução já lançada (saldo abatido), mas falta anexar a NF de devolução no portal.'},
   dev_divergente:   {c:'var(--serious)',  i:'≠', dk:false, d:'Devolução lançada, mas o saldo não bate com o valor devolvido no portal.'},
   valor_incorreto:  {c:'var(--serious)',  i:'$', dk:false, d:'Valor da nota diferente do aprovado no laudo / da NF anexada no portal.'},
+  pag_recusado:     {c:'var(--serious)',  i:'✕', dk:false, d:'Seguradora recusou a NF / não liberou o pagamento no portal.'},
   nf_nao_anexada:   {c:'var(--warning)',  i:'!', dk:true,  d:'A nota não foi inserida no pedido do portal – seguradora não paga.'},
   entrega_pendente: {c:'var(--warning)',  i:'⏱', dk:true, d:'Peças sem baixa de entrega no portal.'},
   ok_aguardando:    {c:'var(--good)',     i:'✓', dk:false, d:'Tudo certo no portal – só falta a seguradora pagar (cobrar).'},
+  pago_portal:      {c:'var(--info)',     i:'R$', dk:false, d:'Portal mostra as peças como pagas, mas o saldo continua na planilha – financeiro conferir.'},
   nao_localizado:   {c:'var(--neutral)',  i:'?', dk:false, d:'Pedido/sinistro/placa não encontrados no portal.'},
   nao_consultado:   {c:'var(--info)',     i:'…', dk:false, d:'Robô ainda não consultou este pedido.'},
 };
 const GRUPOS = [
   {id:'dev', nome:'Devolução', i:'↩', c:'var(--critical)', d:'Peças devolvidas/canceladas no portal', cats:['dev_pendente','dev_nf_cilia','dev_divergente'], extra:true},
-  {id:'nf', nome:'Problema na nota fiscal', i:'$', c:'var(--serious)', d:'Nota não inserida no portal ou emitida com valor errado', cats:['nf_nao_anexada','valor_incorreto']},
+  {id:'nf', nome:'Problema na nota fiscal', i:'$', c:'var(--serious)', d:'Nota não inserida no portal ou emitida com valor errado', cats:['nf_nao_anexada','valor_incorreto','pag_recusado']},
   {id:'ent', nome:'Entrega não baixada no portal', i:'⏱', c:'var(--warning)', dk:true, d:'Peças sem baixa de entrega', cats:['entrega_pendente']},
-  {id:'ok', nome:'OK – aguardando pagamento', i:'✓', c:'var(--good)', d:'Tudo certo no portal – cobrar a seguradora', cats:['ok_aguardando']},
+  {id:'ok', nome:'OK – aguardando pagamento', i:'✓', c:'var(--good)', d:'Tudo certo no portal – cobrar a seguradora', cats:['ok_aguardando','pago_portal']},
   {id:'out', nome:'Sem informação do portal', i:'?', c:'var(--neutral)', d:'Não localizado ou ainda não consultado', cats:['nao_localizado','nao_consultado']},
 ];
 const NOME_SUB = {dev_pendente:'Não lançada no sistema (saldo integral)', dev_nf_cilia:'Lançada, falta NF de devolução no portal', dev_divergente:'Lançada com valor divergente',
-  nf_nao_anexada:'Nota não inserida no portal', valor_incorreto:'Nota emitida com valor incorreto', entrega_pendente:'Entrega não baixada', ok_aguardando:'OK – aguardando pagamento',
+  nf_nao_anexada:'Nota não inserida no portal', valor_incorreto:'Nota emitida com valor incorreto', pag_recusado:'Pagamento não liberado / NF recusada', pago_portal:'Portal mostra PAGO – financeiro conferir', entrega_pendente:'Entrega não baixada', ok_aguardando:'OK – aguardando pagamento',
   nao_localizado:'Não localizado no portal', nao_consultado:'Aguardando consulta do robô'};
 const GRUPO_ITEM = {
   entregue:['Entregue','var(--good)'], em_entrega:['Em entrega','var(--warning)'], aguardando_nota:['Ag. nota / aprovado','var(--warning)'],
@@ -341,11 +343,11 @@ function render(){
   const baseV=filtradas(true,true), vend={};
   baseV.forEach(n=>{const v=n.vendedor||'(sem vendedor)';(vend[v]=vend[v]||[]).push(n)});
   const cats=Object.keys(D.categorias);
-  const abrev={dev_pendente:'Dev. não lançada',dev_nf_cilia:'Falta NF dev. portal',dev_divergente:'Dev. divergente',valor_incorreto:'Valor incorreto',nf_nao_anexada:'Nota não inserida',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK',nao_localizado:'Não localiz.',nao_consultado:'Ag. robô'};
-  const PROB=['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','nf_nao_anexada','entrega_pendente','nao_localizado'];
+  const abrev={dev_pendente:'Dev. não lançada',dev_nf_cilia:'Falta NF dev. portal',dev_divergente:'Dev. divergente',valor_incorreto:'Valor incorreto',pag_recusado:'NF recusada',pago_portal:'Pago no portal',nf_nao_anexada:'Nota não inserida',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK',nao_localizado:'Não localiz.',nao_consultado:'Ag. robô'};
+  const PROB=['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','pag_recusado','nf_nao_anexada','entrega_pendente','nao_localizado'];
   const vArr=Object.entries(vend).map(([v,a])=>({v,a,prob:a.filter(n=>PROB.includes(n.categoria))})).sort((x,y)=>soma(y.prob,'saldo')-soma(x.prob,'saldo')||soma(y.a,'saldo')-soma(x.a,'saldo'));
   h+=`<div class="listahdr"><h2>Problemas por vendedor</h2><span class="sp"></span><button id="xvendtodos" title="Um arquivo com uma aba por vendedor">⤓ Excel – todos os vendedores</button></div>
-  <div class="tabwrap" style="max-height:none"><table class="vend"><thead><tr><th>Vendedor</th><th class="num">NFs</th><th class="num">Saldo</th><th class="num">Saldo c/ problema</th><th class="num" title="Casos críticos respondidos / concluídos pelo vendedor">Respostas</th>${cats.map(k=>`<th style="text-align:center"><span class="tag" style="--c:${CAT_ESTILO[k].c}"><i></i>${abrev[k]}</span></th>`).join('')}<th></th></tr></thead><tbody>`+
+  <div class="tabwrap" style="max-height:none"><table class="vend"><thead><tr><th>Vendedor</th><th class="num">NFs</th><th class="num">Saldo</th><th class="num">Saldo c/ problema</th><th class="num" title="Casos críticos respondidos / concluídos pelo vendedor">Respostas</th>${cats.map(k=>`<th style="text-align:center"><span class="tag" style="--c:${(CAT_ESTILO[k]||{c:"var(--neutral)"}).c}"><i></i>${abrev[k]||k}</span></th>`).join('')}<th></th></tr></thead><tbody>`+
     vArr.map(({v,a,prob})=>`<tr class="${fVend.value===v?'on':''}" style="cursor:default"><td><a href="#" data-abrirvend="${esc(v)}" title="Abrir a página do vendedor"><b>${esc(v)}</b></a></td><td class="num">${a.length}</td><td class="num">${brl(soma(a,'saldo'))}</td><td class="num ${prob.length?'vermelho':''}">${brl(soma(prob,'saldo'))}</td><td class="num">${respResumo(a)}</td>`+
       cats.map(k=>{const q=a.filter(n=>n.categoria===k).length;return `<td class="c ${q?'':'z'}" ${q?`data-vend="${esc(v)}" data-vcat="${k}" data-tip="${esc(v)} · ${esc(D.categorias[k])}: ${q} NFs · ${brl(soma(a.filter(n=>n.categoria===k),'saldo'))}"`:''}>${q||'·'}</td>`}).join('')+
       `<td style="white-space:nowrap"><button class="mini" data-vver="${esc(v)}">${fVend.value===v?'Todos':'Ver'}</button> <button class="mini" data-xvend="${esc(v)}">⤓ Excel</button></td></tr>`).join('')+
@@ -487,7 +489,7 @@ function exportarCategoria(k){ const l=filtradas(true).filter(n=>n.categoria===k
   exportar('Seguradoras_'+(NOME_SUB[k]||D.categorias[k])+(fVend.value?'_'+fVend.value:''),{'Notas':linhasNotas(l),'Peças':linhasItens(l)}); }
 function exportarVendedor(v){ const l=filtradas(true,true).filter(n=>(n.vendedor||'(sem vendedor)')===v);
   const abas={'Resumo':linhasResumo(l)};
-  const CURTO={dev_pendente:'Devolução não lançada',dev_nf_cilia:'Falta NF devolução portal',dev_divergente:'Devolução divergente',valor_incorreto:'Valor incorreto',nf_nao_anexada:'Nota não inserida portal',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK aguardando pgto',nao_localizado:'Não localizado',nao_consultado:'Aguardando robô'};
+  const CURTO={dev_pendente:'Devolução não lançada',dev_nf_cilia:'Falta NF devolução portal',dev_divergente:'Devolução divergente',valor_incorreto:'Valor incorreto',pag_recusado:'NF recusada',pago_portal:'Pago no portal',nf_nao_anexada:'Nota não inserida portal',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK aguardando pgto',nao_localizado:'Não localizado',nao_consultado:'Aguardando robô'};
   Object.keys(D.categorias).forEach(k=>{const a=l.filter(n=>n.categoria===k); if(a.length) abas[CURTO[k]||k]=linhasNotas(a);});
   abas['Peças']=linhasItens(l);
   exportar('Seguradoras_vendedor_'+v,abas); }
@@ -532,7 +534,7 @@ function gsBack(){
 }
 const BACK = window.BACK || ((typeof google!=='undefined' && google.script && google.script.run) ? gsBack() : null);
 const MODO_WEB = !!BACK;
-const CRIT = ['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','nf_nao_anexada','entrega_pendente'];
+const CRIT = ['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','pag_recusado','nf_nao_anexada','entrega_pendente'];
 // ---------------------------------------------------------------------------------------------
 // Formulário simples do vendedor: 1 pergunta Sim/Não + poucos campos. Não existe "Concluído":
 // o caso some sozinho quando a NF sair da planilha de pendências (financeiro baixou).
@@ -555,6 +557,9 @@ const FLUXOS = {
   val: {cats:['valor_incorreto'], pergunta:'Já corrigiu o valor da nota?',
     sim:{campos:[['como','Como?','select',['Carta de correção','NF complementar','Cancelei e emiti nova NF','Valor está certo – ajustado no portal']],['nf_nova','Nº da nova NF (se houver)','text','']]},
     nao:{campos:[['motivo','Por quê?','select',['Vou corrigir','Aguardando seguradora / regulador','Outro']]]}},
+  rec: {cats:['pag_recusado'], pergunta:'Já tratou a recusa da NF com a seguradora?',
+    sim:{campos:[['como','O que foi feito?','select',['Reenviei a NF corrigida no portal','Seguradora vai liberar o pagamento','Emiti nova NF','Outro']],['nf_nova','Nº da nova NF (se houver)','text','']]},
+    nao:{campos:[['motivo','Por quê?','select',['Não sei o motivo da recusa','Vou corrigir e reenviar','Aguardando retorno da seguradora','Outro']]]}},
   ent: {cats:['entrega_pendente'], pergunta:'Deu baixa da entrega no portal?',
     sim:{campos:[]},
     nao:{campos:[['motivo','Por quê?','select',['Peça ainda não foi entregue','Portal não deixa dar baixa','Outro']],['previsao','Previsão de entrega','date']]}},
@@ -582,7 +587,8 @@ function situacaoReg(j){
             cor:venc?'var(--warning)':'var(--info)', alerta: venc?'Previsão de chegada vencida':''};
   }
   const feito = {devnf:'NF de devolução anexada'+(c.nf_retorno?' ('+c.nf_retorno+')':''), nf:'NF inserida no portal',
-                 val:'Valor corrigido'+(c.como?' – '+c.como:'')+(c.nf_nova?' · NF '+c.nf_nova:''), ent:'Baixa de entrega feita'}[j.fluxo]||'Feito';
+                 val:'Valor corrigido'+(c.como?' – '+c.como:'')+(c.nf_nova?' · NF '+c.nf_nova:''), ent:'Baixa de entrega feita',
+                 rec:'Recusa tratada'+(c.como?' – '+c.como:'')+(c.nf_nova?' · NF '+c.nf_nova:'')}[j.fluxo]||'Feito';
   return {cod:'aguarda', txt:feito+' – aguardando o robô confirmar', cor:roboDepois?'var(--warning)':'var(--info)',
           alerta: roboDepois ? 'Robô rodou depois e o portal ainda mostra pendente' : ''};
 }

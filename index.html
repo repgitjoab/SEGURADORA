@@ -888,7 +888,28 @@ document.addEventListener('click',e=>{
   const cp=t.closest('[data-copiar]'); if(cp){ const s=cp.dataset.copiar; (navigator.clipboard?navigator.clipboard.writeText(s):Promise.reject()).then(()=>{cp.textContent='Link copiado!';},()=>prompt('Copie o link:',s)); return; }
 });
 
+// dashboard aberto no computador (arquivo): lê as respostas dos vendedores direto do Firebase (só leitura)
+function fsValor(v){
+  if(!v) return null;
+  if('stringValue' in v) return v.stringValue;
+  if('integerValue' in v) return +v.integerValue;
+  if('doubleValue' in v) return v.doubleValue;
+  if('booleanValue' in v) return v.booleanValue;
+  if('nullValue' in v) return null;
+  if('timestampValue' in v) return v.timestampValue;
+  if('mapValue' in v){ const o={}; Object.entries(v.mapValue.fields||{}).forEach(([k,x])=>o[k]=fsValor(x)); return o; }
+  if('arrayValue' in v) return (v.arrayValue.values||[]).map(fsValor);
+  return null;
+}
+function carregarJustFirebase(){
+  const fb=D.fb||{}; if(!fb.projectId||!fb.apiKey) return false;
+  fetch(`https://firestore.googleapis.com/v1/projects/${fb.projectId}/databases/(default)/documents/seguradoras/respostas?key=${fb.apiKey}`)
+    .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.fields) return; const m=fsValor(j.fields.m)||{}; JUST=m; render(); })
+    .catch(()=>{});
+  return true;
+}
 function carregarJustJSONP(){
+  if(carregarJustFirebase()) return;
   if(!D.web_url) return;
   window.__just = o => { JUST=o.just||{}; render(); };
   const s=document.createElement('script'); s.src=D.web_url+(D.web_url.includes('?')?'&':'?')+'acao=just&cb=__just&t='+Date.now();

@@ -241,7 +241,8 @@ const CAT_ESTILO = {
   valor_incorreto:  {c:'var(--serious)',  i:'$', dk:false, d:'Valor da nota diferente do aprovado no laudo / da NF anexada no portal.'},
   pag_recusado:     {c:'var(--serious)',  i:'✕', dk:false, d:'Seguradora recusou a NF / não liberou o pagamento no portal.'},
   nf_nao_anexada:   {c:'var(--warning)',  i:'!', dk:true,  d:'A nota não foi inserida no pedido do portal – seguradora não paga.'},
-  entrega_pendente: {c:'var(--warning)',  i:'⏱', dk:true, d:'Peças sem baixa de entrega no portal.'},
+  entrega_pendente: {c:'var(--warning)',  i:'⏱', dk:true, d:'Peças sem baixa de entrega no portal há mais de 30 dias da emissão.'},
+  entrega_prazo:    {c:'var(--info)',     i:'⏳', dk:false, d:'Entrega em andamento, NF com menos de 30 dias – só acompanhar.'},
   ok_aguardando:    {c:'var(--good)',     i:'✓', dk:false, d:'Tudo certo no portal – só falta a seguradora pagar (cobrar).'},
   pago_portal:      {c:'var(--info)',     i:'R$', dk:false, d:'Portal mostra as peças como pagas, mas o saldo continua na planilha – financeiro conferir.'},
   nao_localizado:   {c:'var(--neutral)',  i:'?', dk:false, d:'Pedido/sinistro/placa não encontrados no portal.'},
@@ -250,12 +251,12 @@ const CAT_ESTILO = {
 const GRUPOS = [
   {id:'dev', nome:'Devolução', i:'↩', c:'var(--critical)', d:'Peças devolvidas/canceladas no portal', cats:['dev_pendente','dev_nf_cilia','dev_divergente'], extra:true},
   {id:'nf', nome:'Problema na nota fiscal', i:'$', c:'var(--serious)', d:'Nota não inserida no portal ou emitida com valor errado', cats:['nf_nao_anexada','valor_incorreto','pag_recusado']},
-  {id:'ent', nome:'Entrega não baixada no portal', i:'⏱', c:'var(--warning)', dk:true, d:'Peças sem baixa de entrega', cats:['entrega_pendente']},
+  {id:'ent', nome:'Entrega', i:'⏱', c:'var(--warning)', dk:true, d:'Sem baixa de entrega há mais de 30 dias e entregas em andamento (menos de 30 dias)', cats:['entrega_pendente','entrega_prazo']},
   {id:'ok', nome:'OK – aguardando pagamento', i:'✓', c:'var(--good)', d:'Tudo certo no portal – cobrar a seguradora', cats:['ok_aguardando','pago_portal']},
   {id:'out', nome:'Sem informação do portal', i:'?', c:'var(--neutral)', d:'Não localizado ou ainda não consultado', cats:['nao_localizado','nao_consultado']},
 ];
 const NOME_SUB = {dev_pendente:'Não lançada no sistema (saldo integral)', dev_nf_cilia:'Lançada, falta NF de devolução no portal', dev_divergente:'Lançada com valor divergente',
-  nf_nao_anexada:'Nota não inserida no portal', valor_incorreto:'Nota emitida com valor incorreto', pag_recusado:'Pagamento não liberado / NF recusada', pago_portal:'Portal mostra PAGO – financeiro conferir', entrega_pendente:'Entrega não baixada', ok_aguardando:'OK – aguardando pagamento',
+  nf_nao_anexada:'Nota não inserida no portal', valor_incorreto:'Nota emitida com valor incorreto', pag_recusado:'Pagamento não liberado / NF recusada', pago_portal:'Portal mostra PAGO – financeiro conferir', entrega_pendente:'Entrega não baixada (+30 dias)', entrega_prazo:'Em andamento – menos de 30 dias', ok_aguardando:'OK – aguardando pagamento',
   nao_localizado:'Não localizado no portal', nao_consultado:'Aguardando consulta do robô'};
 const GRUPO_ITEM = {
   entregue:['Entregue','var(--good)'], em_entrega:['Em entrega','var(--warning)'], aguardando_nota:['Ag. nota / aprovado','var(--warning)'],
@@ -344,7 +345,7 @@ function render(){
   const baseV=filtradas(true,true), vend={};
   baseV.forEach(n=>{const v=n.vendedor||'(sem vendedor)';(vend[v]=vend[v]||[]).push(n)});
   const cats=Object.keys(D.categorias);
-  const abrev={dev_pendente:'Dev. não lançada',dev_nf_cilia:'Falta NF dev. portal',dev_divergente:'Dev. divergente',valor_incorreto:'Valor incorreto',pag_recusado:'NF recusada',pago_portal:'Pago no portal',nf_nao_anexada:'Nota não inserida',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK',nao_localizado:'Não localiz.',nao_consultado:'Ag. robô'};
+  const abrev={dev_pendente:'Dev. não lançada',dev_nf_cilia:'Falta NF dev. portal',dev_divergente:'Dev. divergente',valor_incorreto:'Valor incorreto',pag_recusado:'NF recusada',pago_portal:'Pago no portal',nf_nao_anexada:'Nota não inserida',entrega_pendente:'Entrega não baixada',entrega_prazo:'Entrega no prazo',ok_aguardando:'OK',nao_localizado:'Não localiz.',nao_consultado:'Ag. robô'};
   const PROB=['dev_pendente','dev_nf_cilia','dev_divergente','valor_incorreto','pag_recusado','nf_nao_anexada','entrega_pendente','nao_localizado'];
   const vArr=Object.entries(vend).map(([v,a])=>({v,a,prob:a.filter(n=>PROB.includes(n.categoria))})).sort((x,y)=>soma(y.prob,'saldo')-soma(x.prob,'saldo')||soma(y.a,'saldo')-soma(x.a,'saldo'));
   h+=`<div class="listahdr"><h2>Problemas por vendedor</h2><span class="sp"></span><button id="xvendtodos" title="Um arquivo com uma aba por vendedor">⤓ Excel – todos os vendedores</button></div>
@@ -490,7 +491,7 @@ function exportarCategoria(k){ const l=filtradas(true).filter(n=>n.categoria===k
   exportar('Seguradoras_'+(NOME_SUB[k]||D.categorias[k])+(fVend.value?'_'+fVend.value:''),{'Notas':linhasNotas(l),'Peças':linhasItens(l)}); }
 function exportarVendedor(v){ const l=filtradas(true,true).filter(n=>(n.vendedor||'(sem vendedor)')===v);
   const abas={'Resumo':linhasResumo(l)};
-  const CURTO={dev_pendente:'Devolução não lançada',dev_nf_cilia:'Falta NF devolução portal',dev_divergente:'Devolução divergente',valor_incorreto:'Valor incorreto',pag_recusado:'NF recusada',pago_portal:'Pago no portal',nf_nao_anexada:'Nota não inserida portal',entrega_pendente:'Entrega não baixada',ok_aguardando:'OK aguardando pgto',nao_localizado:'Não localizado',nao_consultado:'Aguardando robô'};
+  const CURTO={dev_pendente:'Devolução não lançada',dev_nf_cilia:'Falta NF devolução portal',dev_divergente:'Devolução divergente',valor_incorreto:'Valor incorreto',pag_recusado:'NF recusada',pago_portal:'Pago no portal',nf_nao_anexada:'Nota não inserida portal',entrega_pendente:'Entrega não baixada',entrega_prazo:'Entrega no prazo',ok_aguardando:'OK aguardando pgto',nao_localizado:'Não localizado',nao_consultado:'Aguardando robô'};
   Object.keys(D.categorias).forEach(k=>{const a=l.filter(n=>n.categoria===k); if(a.length) abas[CURTO[k]||k]=linhasNotas(a);});
   abas['Peças']=linhasItens(l);
   exportar('Seguradoras_vendedor_'+v,abas); }

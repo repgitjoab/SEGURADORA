@@ -264,6 +264,9 @@ const GRUPO_ITEM = {
 };
 const brl = v => (v==null||isNaN(v)) ? '—' : v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function nvNome(c){ const m=(D&&D.nomes_vendedores)||{}; return m[String(c||'').toUpperCase()]||((typeof VENDS!=='undefined'&&VENDS.find(x=>x.vendedor===c))||{}).nome||''; }
+function nvTxt(c){ const n=nvNome(c); return n? n+' ('+c+')' : (c||''); }
+function nvHtml(c){ const n=nvNome(c); return n? `${esc(n)}<div class="muted" style="font-size:11px;font-weight:400">${esc(c)}</div>` : esc(c||''); }
 let D=null, sel={cat:null, sinal:null, seg:null, cf:null, grupo:null}, ordem={k:'saldo',dir:-1};
 
 function carregar(d){
@@ -275,7 +278,7 @@ function carregar(d){
   const segs=[...new Set(D.cil.map(n=>nomeSeg(n.cliente)))].sort();
   const vends=[...new Set(D.cil.map(n=>n.vendedor).filter(Boolean))].sort();
   fSeg.innerHTML='<option value="">Todas as seguradoras</option>'+segs.map(s=>`<option>${esc(s)}</option>`).join('');
-  fVend.innerHTML='<option value="">Todos os vendedores</option>'+vends.map(s=>`<option>${esc(s)}</option>`).join('');
+  fVend.innerHTML='<option value="">Todos os vendedores</option>'+vends.map(s=>`<option value="${esc(s)}">${esc(nvTxt(s))}</option>`).join('');
   render();
 }
 function nomeSeg(c){ // agrupa variações do nome (S/A, S.A., SUCURSAL…)
@@ -350,7 +353,7 @@ function render(){
   const vArr=Object.entries(vend).map(([v,a])=>({v,a,prob:a.filter(n=>PROB.includes(n.categoria))})).sort((x,y)=>soma(y.prob,'saldo')-soma(x.prob,'saldo')||soma(y.a,'saldo')-soma(x.a,'saldo'));
   h+=`<div class="listahdr"><h2>Problemas por vendedor</h2><span class="sp"></span><button id="xvendtodos" title="Um arquivo com uma aba por vendedor">⤓ Excel – todos os vendedores</button></div>
   <div class="tabwrap" style="max-height:none"><table class="vend"><thead><tr><th>Vendedor</th><th class="num">NFs</th><th class="num">Saldo</th><th class="num">Saldo c/ problema</th><th class="num" title="Casos críticos respondidos / concluídos pelo vendedor">Respostas</th>${cats.map(k=>`<th style="text-align:center"><span class="tag" style="--c:${(CAT_ESTILO[k]||{c:"var(--neutral)"}).c}"><i></i>${abrev[k]||k}</span></th>`).join('')}<th></th></tr></thead><tbody>`+
-    vArr.map(({v,a,prob})=>`<tr class="${fVend.value===v?'on':''}" style="cursor:default"><td><a href="#" data-abrirvend="${esc(v)}" title="Abrir a página do vendedor"><b>${esc(v)}</b></a></td><td class="num">${a.length}</td><td class="num">${brl(soma(a,'saldo'))}</td><td class="num ${prob.length?'vermelho':''}">${brl(soma(prob,'saldo'))}</td><td class="num">${respResumo(a)}</td>`+
+    vArr.map(({v,a,prob})=>`<tr class="${fVend.value===v?'on':''}" style="cursor:default"><td><a href="#" data-abrirvend="${esc(v)}" title="Abrir a página do vendedor"><b>${nvHtml(v)}</b></a></td><td class="num">${a.length}</td><td class="num">${brl(soma(a,'saldo'))}</td><td class="num ${prob.length?'vermelho':''}">${brl(soma(prob,'saldo'))}</td><td class="num">${respResumo(a)}</td>`+
       cats.map(k=>{const q=a.filter(n=>n.categoria===k).length;return `<td class="c ${q?'':'z'}" ${q?`data-vend="${esc(v)}" data-vcat="${k}" data-tip="${esc(v)} · ${esc(D.categorias[k])}: ${q} NFs · ${brl(soma(a.filter(n=>n.categoria===k),'saldo'))}"`:''}>${q||'·'}</td>`}).join('')+
       `<td style="white-space:nowrap"><button class="mini" data-vver="${esc(v)}">${fVend.value===v?'Todos':'Ver'}</button> <button class="mini" data-xvend="${esc(v)}">⤓ Excel</button></td></tr>`).join('')+
     `</tbody></table></div>`;
@@ -388,7 +391,7 @@ function tabela(lista){
   if(!lista.length) return '<div class="painel vazio-msg">Nenhuma NF nesta seleção.</div>';
   return `<div class="tabwrap"><table><thead><tr>${COLS.map(([c,t,nu])=>`<th class="${nu?'num':''}" data-ord="${c}">${t}${ordem.k===c?(dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>`+
     lista.map(n=>{const st=CAT_ESTILO[n.categoria]||{}; return `<tr data-nf="${esc(n.nf)}">
-      <td><b>${esc(n.nf)}</b></td><td>${esc(n.portal_nome||'')}</td><td>${esc(n.vendedor||'')}</td><td>${esc(n.emissao)}</td><td>${esc(n.vencimento)}</td>
+      <td><b>${esc(n.nf)}</b></td><td>${esc(n.portal_nome||'')}</td><td>${nvHtml(n.vendedor)}</td><td>${esc(n.emissao)}</td><td>${esc(n.vencimento)}</td>
       <td class="num ${n.dias_atraso>60?'vermelho':''}">${n.dias_atraso??''}</td><td>${esc(nomeSeg(n.cliente))}</td>
       <td>${esc(n.pedido)}</td><td>${esc(n.sinistro)}</td><td>${esc(n.placa)}</td>
       <td class="num">${brl(n.valor)}</td><td class="num">${brl(n.saldo)}</td><td class="num">${n.valor_esperado==null?'—':brl(n.valor_esperado)}</td>
@@ -407,7 +410,7 @@ function detalhe(nf){
   let h=`<div class="alerta" style="--c:${st.c}"><b>${esc(NOME_SUB[n.categoria]||D.categorias[n.categoria])}</b>${n.confirmado?'':' <span class="muted">(ainda não confirmado no portal)</span>'}<ul style="margin:6px 0 0;padding-left:18px">${(n.motivos||[]).map(m=>`<li>${esc(m)}</li>`).join('')||'<li class="muted">Sem observações.</li>'}</ul></div>`;
   h+=`<div class="grid2">${campo('Seguradora',esc(n.cliente))}${campo('CNPJ',esc(n.cnpj))}${campo('Emissão / Venc.',esc(n.emissao)+' · '+esc(n.vencimento))}${campo('Atraso',(n.dias_atraso??'—')+' dias')}
     ${campo('Valor NF',brl(n.valor))}${campo(n.dev_baixada?'A receber (dev. já baixada)':'Saldo',brl(n.saldo))}${campo('Peças desta NF no portal',n.valor_esperado==null?'—':brl(n.valor_esperado))}${campo('Devolvido no portal',n.valor_devolvido==null?'—':brl(n.valor_devolvido))}
-    ${campo('Pedido',esc(n.pedido))}${campo('Sinistro',esc(n.sinistro))}${campo('Placa',esc(n.placa))}${campo('Vendedor',esc(n.vendedor))}</div>`;
+    ${campo('Pedido',esc(n.pedido))}${campo('Sinistro',esc(n.sinistro))}${campo('Placa',esc(n.placa))}${campo('Vendedor',esc(nvTxt(n.vendedor)))}</div>`;
   if (n.cilia){
     h+=`<h2>${esc(n.portal_nome||'Portal')}</h2><div class="grid2">${campo('Encontrado por',esc(c.busca||'—'))}${campo('Consultado em',esc((c.consultado_em||'').replace('T',' ')))}
       ${campo('Seguradora no portal',esc(c.seguradora||'—'))}${campo('Veículo',esc((c.veiculo||'—')+(c.placa_cilia?' · '+c.placa_cilia:'')))}${campo('Oficina',esc((c.oficina||'—')+(c.oficina_cidade&&c.oficina_cidade!=='/'?' · '+c.oficina_cidade:'')))}${campo('Pedido criado em',esc((c.criado_em||'').split('-').reverse().join('/')||'—'))}
@@ -440,7 +443,7 @@ function fechar(){dw.classList.remove('on');ov.classList.remove('on')}
 const CFN_X={confirmada:'Devolução confirmada no portal',fin_sem_cilia:'Financeiro diz devolução, portal não mostra',cilia_sem_fin:'Portal mostra devolução não anotada',pendente:'Anotação aguardando robô'};
 function linhasNotas(l){
   return l.map(n=>({'NF':n.nf,'Portal':n.portal_nome||'','Emissão':n.emissao,'Vencimento':n.vencimento,'Dias atraso':n.dias_atraso,'Seguradora':n.cliente,'CNPJ':n.cnpj,
-    'Vendedor':n.vendedor,'Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa,'Valor NF':n.valor,'Saldo':n.saldo,
+    'Vendedor':nvTxt(n.vendedor),'Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa,'Valor NF':n.valor,'Saldo':n.saldo,
     'Peças desta NF no portal':n.valor_esperado??'','Devolvido no portal':n.valor_devolvido??'','Grupo':(GRUPOS.find(g=>g.cats.includes(n.categoria))||{}).nome||'','Situação':NOME_SUB[n.categoria]||D.categorias[n.categoria]||'',
     'Motivo':(n.motivos||[]).join(' | '),'Resposta – status':(JUST[n.nf]||{}).status||'','Resposta – ação':(JUST[n.nf]||{}).acao||'','Resposta – Nº NF':(JUST[n.nf]||{}).nf_dev||'','Resposta – obs.':(JUST[n.nf]||{}).obs||'','Resposta – data':(JUST[n.nf]||{}).quando||'','Financeiro x portal':CFN_X[n.conf_fin]||'','Obs. financeiro':n.obs_financeiro,
     'Consultado em':((n.cilia||{}).consultado_em||'').replace('T',' '),'Link portal':(n.cilia||{}).url||''}));
@@ -448,7 +451,7 @@ function linhasNotas(l){
 function linhasItens(l){
   const out=[];
   l.forEach(n=>{const it=(n.cilia||{}).itens||[]; let sel=it.filter(i=>i.desta_nf); if(!sel.length) sel=it.filter(i=>i.grupo!=='nao_aprovado');
-    sel.forEach(i=>out.push({'NF':n.nf,'Portal':n.portal_nome||'','Vendedor':n.vendedor,'Seguradora':n.cliente,'Pedido':n.pedido,'Situação da NF':D.categorias[n.categoria]||'',
+    sel.forEach(i=>out.push({'NF':n.nf,'Portal':n.portal_nome||'','Vendedor':nvTxt(n.vendedor),'Seguradora':n.cliente,'Pedido':n.pedido,'Situação da NF':D.categorias[n.categoria]||'',
       'Status portal':i.status_nome||i.status,'Código':i.codigo||'','Item':i.item,'Qtd':i.qtd,'Preço un.':typeof i.preco_un==='number'?i.preco_un:(i.preco_un||''),
       'Total':i.total??'','NF da peça':i.nf||'','NF devolução pendente':i.dev_pendente?'SIM':''}));});
   return out;
@@ -686,7 +689,7 @@ function renderVend(){
   const okL=todos.filter(n=>n.categoria==='ok_aguardando').sort((a,b)=>b.saldo-a.saldo);
   const outL=todos.filter(n=>!CRIT.includes(n.categoria)&&n.categoria!=='ok_aguardando');
   const q=k=>crit.filter(n=>filtroCaso(n,k)).length;
-  const nome=(VENDS.find(x=>x.vendedor===v)||{}).nome;
+  const nome=nvNome(v);
   const lk=linkVend(v);
   let h=`<div class="vtop">${window.VEND_INICIAL?'':'<button id="voltarvend">← Todos os vendedores</button>'}
      <h2 style="margin:0;font-size:20px;text-transform:none;color:var(--ink)">${esc(nome||v)} <span class="muted" style="font-size:13px">${nome?esc(v):''}</span></h2><span class="sp"></span>
@@ -740,7 +743,7 @@ function ultimaEntrega(n){
 function linhasCobranca(l){
   return l.map(n=>({'Seguradora':n.cliente,'CNPJ':n.cnpj,'NF':n.nf,'Emissão':n.emissao,'Vencimento':n.vencimento,'Dias de atraso':n.dias_atraso,
     'Valor NF':n.valor,'Saldo em aberto':n.saldo,'Sinistro':n.sinistro,'Placa':n.placa,'Pedido':n.pedido,'Portal':n.portal_nome||'',
-    'NF inserida no portal':'Sim','Peças entregues':'Sim','Entrega (portal)':ultimaEntrega(n),'Oficina':(n.cilia||{}).oficina||'','Vendedor':n.vendedor}));
+    'NF inserida no portal':'Sim','Peças entregues':'Sim','Entrega (portal)':ultimaEntrega(n),'Oficina':(n.cilia||{}).oficina||'','Vendedor':nvTxt(n.vendedor)}));
 }
 function okFiltradas(){ return filtradas(true).filter(n=>n.categoria==='ok_aguardando'); }
 function porSeg(l){ const o={}; l.forEach(n=>{const s=nomeSeg(n.cliente);(o[s]=o[s]||[]).push(n)}); return Object.entries(o).sort((a,b)=>soma(b[1],'saldo')-soma(a[1],'saldo')); }
@@ -760,7 +763,7 @@ function renderCobranca(){
       <button class="mini" data-email="${esc(s)}">✉ Copiar e-mail</button><button class="mini" data-xcob="${esc(s)}">⤓ Excel</button></div>
       <div class="tabwrap"><table><thead><tr><th>NF</th><th>Emissão</th><th>Venc.</th><th class="num">Atraso</th><th class="num">Saldo</th><th>Sinistro</th><th>Placa</th><th>Pedido</th><th>Portal</th><th>Entrega</th><th>Vendedor</th></tr></thead><tbody>`+
       a.map(n=>`<tr data-nf="${esc(n.nf)}"><td><b>${esc(n.nf)}</b></td><td>${esc(n.emissao)}</td><td>${esc(n.vencimento)}</td><td class="num ${n.dias_atraso>60?'vermelho':''}">${n.dias_atraso??''}</td>
-        <td class="num">${brl(n.saldo)}</td><td>${esc(n.sinistro)}</td><td>${esc(n.placa)}</td><td>${esc(n.pedido)}</td><td>${esc(n.portal_nome||'')}</td><td>${esc(ultimaEntrega(n))}</td><td>${esc(n.vendedor||'')}</td></tr>`).join('')+
+        <td class="num">${brl(n.saldo)}</td><td>${esc(n.sinistro)}</td><td>${esc(n.placa)}</td><td>${esc(n.pedido)}</td><td>${esc(n.portal_nome||'')}</td><td>${esc(ultimaEntrega(n))}</td><td>${nvHtml(n.vendedor)}</td></tr>`).join('')+
       `</tbody></table></div></div>`;
   }
   app.innerHTML=h;
@@ -789,7 +792,7 @@ function exportarCobranca(s){
 }
 function linhasBaixa(l){
   return l.map(n=>{const j=JUST[n.nf]||{}, c=j.campos||{}, s=situacao(n)||{};
-    return {'NF':n.nf,'Seguradora':n.cliente,'Vendedor':n.vendedor,'Portal':n.portal_nome||'','Saldo':n.saldo,'Devolvido no portal':n.valor_devolvido??'',
+    return {'NF':n.nf,'Seguradora':n.cliente,'Vendedor':nvTxt(n.vendedor),'Portal':n.portal_nome||'','Saldo':n.saldo,'Devolvido no portal':n.valor_devolvido??'',
       'Situação':s.txt||'','Transportadora':c.transportadora||'','NF de retorno':c.nf_retorno||'','Previsão de chegada':fmtData(c.previsao),'Atenção':s.alerta||'',
       'Obs. vendedor':j.obs||'','Respondido em':j.quando||'','Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa};});
 }
@@ -800,7 +803,7 @@ function renderBaixa(){
   const alerta=base.filter(n=>(situacao(n)||{}).alerta);
   const semResp=base.filter(n=>!JUST[n.nf]);
   const tb=(l)=> l.length?`<div class="tabwrap"><table><thead><tr><th>NF</th><th>Vendedor</th><th>Seguradora</th><th class="num">Saldo</th><th>Situação informada</th><th>NF retorno</th><th>Previsão</th><th>Respondido em</th><th>Obs.</th></tr></thead><tbody>`+
-    l.map(n=>{const j=JUST[n.nf]||{},c=j.campos||{},s=situacao(n)||{}; return `<tr data-nf="${esc(n.nf)}"><td><b>${esc(n.nf)}</b></td><td>${esc(n.vendedor||'')}</td><td>${esc(nomeSeg(n.cliente))}</td><td class="num">${brl(n.saldo)}</td>
+    l.map(n=>{const j=JUST[n.nf]||{},c=j.campos||{},s=situacao(n)||{}; return `<tr data-nf="${esc(n.nf)}"><td><b>${esc(n.nf)}</b></td><td>${nvHtml(n.vendedor)}</td><td>${esc(nomeSeg(n.cliente))}</td><td class="num">${brl(n.saldo)}</td>
       <td>${tagResp(n)}</td><td>${esc(c.nf_retorno||c.nf_nova||'')}</td><td class="${s.alerta?'vermelho':''}">${esc(fmtData(c.previsao))}</td><td>${esc(j.quando||'')}</td><td class="mot">${esc(j.obs||'')}</td></tr>`}).join('')+`</tbody></table></div>`
     : '<div class="painel muted">Nenhuma.</div>';
   app.innerHTML=abasTopo()+`<div class="kpis">
@@ -829,13 +832,13 @@ function filtraBx(l, campoData){
 }
 function diasEntre(a,b){const x=dataNumBR(a),y=dataNumBR(b);return x&&y?Math.round((y-x)/86400000):null}
 function linhasBaixadas(l){
-  return l.map(n=>{const j=JUST[n.nf]||{}; return {'NF':n.nf,'Seguradora':n.cliente,'CNPJ':n.cnpj,'Vendedor':n.vendedor,'Portal':n.portal_nome||n.portal,
+  return l.map(n=>{const j=JUST[n.nf]||{}; return {'NF':n.nf,'Seguradora':n.cliente,'CNPJ':n.cnpj,'Vendedor':nvTxt(n.vendedor),'Portal':n.portal_nome||n.portal,
     'Emissão':n.emissao,'Vencimento':n.vencimento,'Saiu da planilha em':n.data_baixa,'Dias da emissão até a baixa':diasEntre(n.emissao,n.data_baixa),
     'Valor NF':n.valor,'Saldo baixado':n.saldo_baixado,'Última situação no portal':n.situacao,'Motivo':n.motivo,
     'Resposta do vendedor':(situacaoReg(j)||{}).txt||'','Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa,'Planilha':n.planilha_baixa};});
 }
 function linhasParciais(l){
-  return l.map(p=>({'NF':p.nf,'Data':p.data,'Seguradora':p.cliente,'Vendedor':p.vendedor,'Portal':p.portal,'Valor NF':p.valor,
+  return l.map(p=>({'NF':p.nf,'Data':p.data,'Seguradora':p.cliente,'Vendedor':nvTxt(p.vendedor),'Portal':p.portal,'Valor NF':p.valor,
     'Saldo antes':p.saldo_antes,'Saldo depois':p.saldo_depois,'Baixado':p.baixado,'Situação':p.situacao}));
 }
 function renderBaixadas(){
@@ -863,14 +866,14 @@ function renderBaixadas(){
       Object.entries(porSegB).sort((a,b)=>b[1].length-a[1].length).map(([k,a])=>`<div class="barra" style="cursor:default"><span class="nm">${esc(k)}</span><span class="vl">${a.length} NFs · ${brl(a.reduce((s,n)=>s+(n.saldo_baixado||0),0))}</span></div>`).join('')+
       `</div></div></div>`;
     h+=`<h2>NFs baixadas / pagas — ${l.length}</h2><div class="tabwrap"><table><thead><tr><th>NF</th><th>Saiu em</th><th>Seguradora</th><th>Vendedor</th><th>Portal</th><th>Emissão</th><th class="num">Dias</th><th class="num">Saldo baixado</th><th>Última situação no portal</th><th>Resposta vendedor</th></tr></thead><tbody>`+
-      l.map(n=>`<tr style="cursor:default"><td><b>${esc(n.nf)}</b></td><td>${esc(n.data_baixa)}</td><td>${esc(nomeSeg(n.cliente))}</td><td>${esc(n.vendedor||'')}</td><td>${esc(n.portal_nome||n.portal||'')}</td>
+      l.map(n=>`<tr style="cursor:default"><td><b>${esc(n.nf)}</b></td><td>${esc(n.data_baixa)}</td><td>${esc(nomeSeg(n.cliente))}</td><td>${nvHtml(n.vendedor)}</td><td>${esc(n.portal_nome||n.portal||'')}</td>
         <td>${esc(n.emissao)}</td><td class="num">${diasEntre(n.emissao,n.data_baixa)??''}</td><td class="num">${brl(n.saldo_baixado)}</td>
         <td>${n.categoria?`<span class="tag" style="--c:${(CAT_ESTILO[n.categoria]||{c:'var(--neutral)'}).c}"><i></i>${esc(NOME_SUB[n.categoria]||n.situacao||'')}</span>`:'<span class="muted">—</span>'}</td>
         <td>${JUST[n.nf]?esc((situacaoReg(JUST[n.nf])||{}).txt||''):''}</td></tr>`).join('')+`</tbody></table></div>`;
   }
   if(pa.length){
     h+=`<h2>Baixas parciais (saldo diminuiu) — ${pa.length}</h2><div class="tabwrap"><table><thead><tr><th>NF</th><th>Data</th><th>Seguradora</th><th>Vendedor</th><th class="num">Saldo antes</th><th class="num">Saldo depois</th><th class="num">Baixado</th><th>Situação</th></tr></thead><tbody>`+
-      pa.map(p=>`<tr style="cursor:default"><td><b>${esc(p.nf)}</b></td><td>${esc(p.data)}</td><td>${esc(nomeSeg(p.cliente))}</td><td>${esc(p.vendedor||'')}</td><td class="num">${brl(p.saldo_antes)}</td><td class="num">${brl(p.saldo_depois)}</td><td class="num">${brl(p.baixado)}</td><td>${esc(p.situacao||'')}</td></tr>`).join('')+`</tbody></table></div>`;
+      pa.map(p=>`<tr style="cursor:default"><td><b>${esc(p.nf)}</b></td><td>${esc(p.data)}</td><td>${esc(nomeSeg(p.cliente))}</td><td>${nvHtml(p.vendedor)}</td><td class="num">${brl(p.saldo_antes)}</td><td class="num">${brl(p.saldo_depois)}</td><td class="num">${brl(p.baixado)}</td><td>${esc(p.situacao||'')}</td></tr>`).join('')+`</tbody></table></div>`;
   }
   app.innerHTML=h;
 }

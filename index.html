@@ -178,7 +178,7 @@ pre{white-space:pre-wrap;font-size:12px;background:var(--card);border:1px solid 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>window.FIREBASE_CONFIG = {"projectId": "pendencias-seguradoras", "appId": "1:697215792147:web:e91381d4edc2cf4806bbe6", "storageBucket": "pendencias-seguradoras.firebasestorage.app", "apiKey": "AIzaSyA5e7bgdZ92fa8kYaDIuvhrabUgWLd1xxc", "authDomain": "pendencias-seguradoras.firebaseapp.com", "messagingSenderId": "697215792147", "projectNumber": "697215792147", "version": "2"};</script>
 <script>// Backend Firebase (Firestore) do dashboard de pendências de seguradora.
-// Coleção "seguradoras":  meta (info + vendedores) | parte_0..N (dados do robô) | respostas (map nf -> resposta)
+// Coleção "seguradoras":  meta (info + vendedores) | parte_0..N (dados do robô) | respostas (m: nf -> resposta do vendedor | c: nf -> controle do assistente)
 (function () {
   firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
@@ -206,9 +206,11 @@ pre{white-space:pre-wrap;font-size:12px;background:var(--card);border:1px solid 
       const txt = partes.map(p => (p.data() || {}).txt || '').join('');
       const r = await col.doc('respostas').get();
       const just = (r.exists && r.data().m) || {};
+      const controle = (r.exists && r.data().c) || {};
       return {
         dados: JSON.parse(txt),
         just,
+        controle,
         vendedores: (META.vendedores || []).map(v => ({vendedor: v.vendedor, nome: v.nome, temPin: !!v.pin_hash})),
       };
     },
@@ -229,6 +231,14 @@ pre{white-space:pre-wrap;font-size:12px;background:var(--card);border:1px solid 
       await col.doc('respostas').set({m: {[r.nf]: Object.assign({}, reg, {hist: FV.arrayUnion(reg)})}}, {merge: true});
       const atual = await col.doc('respostas').get();
       return ((atual.data() || {}).m || {})[r.nf] || Object.assign({hist: [reg]}, reg);
+    },
+    // controle interno do assistente (rastreio / previsão da transportadora) – fica no mesmo documento "respostas", campo "c"
+    async salvarControle(nf, r) {
+      const reg = {quando: agora(), sit: r.sit || 'rastreio', prev: r.prev || '', obs: r.obs || '', por: r.por || ''};
+      const FV = firebase.firestore.FieldValue;
+      await col.doc('respostas').set({c: {[nf]: Object.assign({}, reg, {hist: FV.arrayUnion(reg)})}}, {merge: true});
+      const atual = await col.doc('respostas').get();
+      return ((atual.data() || {}).c || {})[nf] || Object.assign({hist: [reg]}, reg);
     },
   };
 })();
@@ -433,6 +443,7 @@ function detalhe(nf){
   }
   const hist=(n.obs_financeiro||'').split(/\s{2,}|(?=\b\d{2}\/\d{2}\s)/).map(s=>s.trim()).filter(Boolean);
   h+=blocoRespostaDrawer(n);
+  if(!window.VEND_INICIAL && (CTRL[n.nf]||(JUST[n.nf]&&JUST[n.nf].fluxo==='dev'))) h+=`<h2>Rastreio (assistente)</h2><div class="painel">${ctrlHtml(n.nf)}</div>`;
   h+=`<h2>Histórico do financeiro</h2><div class="hist">${hist.map(s=>`<div>${esc(s)}</div>`).join('')||'<div class="muted">Sem anotações.</div>'}</div>`;
   h+=`<h2>Observação da nota</h2><pre>${esc(n.obs_nota)}</pre>`;
   if (c.texto_pagina) h+=`<details><summary class="muted">Texto bruto da página do portal</summary><pre>${esc(c.texto_pagina)}</pre></details>`;
@@ -531,7 +542,7 @@ document.addEventListener('mousemove',e=>{const b=e.target.closest('[data-tip]')
 let tm; fBusca.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(render,200)});
 arq.addEventListener('change',async()=>{const f=arq.files[0]; if(!f) return; let s=await f.text(); s=s.replace(/^\s*window\.DADOS_CILIA\s*=\s*/,'').replace(/;\s*$/,''); carregar(JSON.parse(s));});
 // ===================== RESPOSTAS DOS VENDEDORES / PÁGINA DO VENDEDOR =====================
-let JUST = {}, VENDS = [], modoVend = null, filtroResp = 'todos';
+let JUST = {}, CTRL = {}, VENDS = [], modoVend = null, filtroResp = 'todos';
 // backend: Firebase (window.BACK definido pela versão web) ou Google Apps Script
 function gsBack(){
   const call=(fn,arg)=>new Promise((ok,ko)=>{ const r=google.script.run.withSuccessHandler(s=>ok(JSON.parse(s))).withFailureHandler(ko); arg===undefined?r[fn]():r[fn](arg); });
@@ -794,17 +805,65 @@ function linhasBaixa(l){
   return l.map(n=>{const j=JUST[n.nf]||{}, c=j.campos||{}, s=situacao(n)||{};
     return {'NF':n.nf,'Seguradora':n.cliente,'Vendedor':nvTxt(n.vendedor),'Portal':n.portal_nome||'','Saldo':n.saldo,'Devolvido no portal':n.valor_devolvido??'',
       'Situação':s.txt||'','Transportadora':c.transportadora||'','NF de retorno':c.nf_retorno||'','Previsão de chegada':fmtData(c.previsao),'Atenção':s.alerta||'',
-      'Obs. vendedor':j.obs||'','Respondido em':j.quando||'','Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa};});
+      'Obs. vendedor':j.obs||'','Respondido em':j.quando||'',
+      'Rastreio (assistente)':ctrlTxt(n.nf),'Prev. transportadora':fmtData((CTRL[n.nf]||{}).prev),'Obs. assistente':(CTRL[n.nf]||{}).obs||'',
+      'Controle atualizado em':(CTRL[n.nf]||{}).quando||'','Pedido':n.pedido,'Sinistro':n.sinistro,'Placa':n.placa};});
 }
+// ---------- controle do assistente (rastreio da coleta / previsão da transportadora) ----------
+function hojeISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function ctrlTxt(nf){ const c=CTRL[nf]; if(!c) return ''; return c.sit==='sem'?'Sem rastreio':(c.prev?'Rastreado – prev. '+fmtData(c.prev):'Rastreado'); }
+function ctrlHtml(nf){
+  const c=CTRL[nf], bt=MODO_WEB?`<button class="mini" data-ctrl="${esc(nf)}" title="Atualizar rastreio / previsão">✎</button>`:'';
+  if(!c) return `<span class="muted">—</span> ${bt}`;
+  const venc=c.sit!=='sem'&&c.prev&&c.prev<hojeISO();
+  return `<div><b class="${c.sit==='sem'?'vermelho':''}">${c.sit==='sem'?'Sem rastreio':'Rastreado'}</b>${c.prev?` · <span class="${venc?'vermelho':''}">prev. ${esc(fmtData(c.prev))}${venc?' (vencida)':''}</span>`:''} ${bt}</div>`
+    +(c.obs?`<div class="mot" style="font-size:12px">${esc(c.obs)}</div>`:'')+`<div class="muted" style="font-size:11px">${esc(c.quando||'')}${c.por?' · '+esc(c.por):''}</div>`;
+}
+function abrirCtrl(nf){
+  const c=CTRL[nf]||{}, n=D.cil.find(x=>x.nf===nf)||{}, j=JUST[nf]||{}, cp=j.campos||{};
+  let quem=''; try{ quem=localStorage.getItem('assistente_nome')||''; }catch(e){}
+  const ov=document.createElement('div'); ov.id='ctrlov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:999;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML=`<div class="painel" style="width:min(460px,92vw)">
+    <h2 style="margin-top:0">Rastreio – NF ${esc(nf)}</h2>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">${esc(nomeSeg(n.cliente||''))} · ${esc(nvTxt(n.vendedor))}<br>
+      Vendedor informou: ${esc(cp.transportadora||'—')} · NF retorno ${esc(cp.nf_retorno||'—')} · prev. ${esc(fmtData(cp.previsao)||'—')}</div>
+    <label style="display:block;margin-bottom:8px"><input type="radio" name="ctrl_sit" value="rastreio" ${c.sit!=='sem'?'checked':''}> Rastreado na transportadora</label>
+    <label style="display:block;margin-bottom:10px"><input type="radio" name="ctrl_sit" value="sem" ${c.sit==='sem'?'checked':''}> Sem rastreio</label>
+    <label style="display:block;margin-bottom:10px">Previsão da transportadora<br><input type="date" id="ctrl_prev" value="${esc(c.prev||'')}"></label>
+    <label style="display:block;margin-bottom:10px">Obs.<br><textarea id="ctrl_obs" rows="3" style="width:100%">${esc(c.obs||'')}</textarea></label>
+    <label style="display:block;margin-bottom:12px">Seu nome<br><input id="ctrl_por" value="${esc(quem)}" style="width:100%"></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="mini" data-ctrlfechar>Cancelar</button><button class="prim" data-ctrlsalvar="${esc(nf)}">Salvar</button></div>
+    ${(c.hist||[]).length>1?`<h2>Histórico</h2><div class="hist" style="max-height:160px;overflow:auto">${c.hist.slice().reverse().map(x=>`<div><span class="muted">${esc(x.quando)}${x.por?' · '+esc(x.por):''}</span> · ${x.sit==='sem'?'Sem rastreio':'Rastreado'}${x.prev?' · prev. '+esc(fmtData(x.prev)):''}${x.obs?' · '+esc(x.obs):''}</div>`).join('')}</div>`:''}
+  </div>`;
+  document.body.appendChild(ov);
+}
+function salvarCtrl(nf){
+  const ov=document.getElementById('ctrlov'); if(!ov) return;
+  const sit=(ov.querySelector('input[name="ctrl_sit"]:checked')||{}).value||'rastreio';
+  const reg={sit, prev:ov.querySelector('#ctrl_prev').value, obs:ov.querySelector('#ctrl_obs').value.trim(), por:ov.querySelector('#ctrl_por').value.trim()};
+  if(sit==='rastreio'&&!reg.prev&&!reg.obs){ alert('Informe a previsão da transportadora (ou marque Sem rastreio).'); return; }
+  try{ localStorage.setItem('assistente_nome',reg.por); }catch(e){}
+  const bt=ov.querySelector('[data-ctrlsalvar]'); bt.disabled=true; bt.textContent='Salvando…';
+  BACK.salvarControle(nf,reg).then(c=>{ CTRL[nf]=c; ov.remove(); render(); })
+    .catch(e=>{ alert(e.message||e); bt.disabled=false; bt.textContent='Salvar'; });
+}
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const a=t.closest('[data-ctrl]'); if(a){ e.stopPropagation(); e.preventDefault(); abrirCtrl(a.dataset.ctrl); return; }
+  const s=t.closest('[data-ctrlsalvar]'); if(s){ e.stopPropagation(); salvarCtrl(s.dataset.ctrlsalvar); return; }
+  if(t.closest('[data-ctrlfechar]')||t.id==='ctrlov'){ e.stopPropagation(); const o=document.getElementById('ctrlov'); if(o) o.remove(); return; }
+  if(t.closest('#ctrlov')) e.stopPropagation();
+}, true);
 function renderBaixa(){
   const base=filtradas(true).filter(n=>CRIT.includes(n.categoria));
   const chegou=base.filter(n=>(situacao(n)||{}).cod==='baixa');
   const coleta=base.filter(n=>{const j=JUST[n.nf]; return j&&j.fluxo==='dev'&&j.resp==='sim'&&!(j.campos||{}).chegou;});
   const alerta=base.filter(n=>(situacao(n)||{}).alerta);
   const semResp=base.filter(n=>!JUST[n.nf]);
-  const tb=(l)=> l.length?`<div class="tabwrap"><table><thead><tr><th>NF</th><th>Vendedor</th><th>Seguradora</th><th class="num">Saldo</th><th>Situação informada</th><th>NF retorno</th><th>Previsão</th><th>Respondido em</th><th>Obs.</th></tr></thead><tbody>`+
+  const tb=(l)=> l.length?`<div class="tabwrap"><table><thead><tr><th>NF</th><th>Vendedor</th><th>Seguradora</th><th class="num">Saldo</th><th>Situação informada</th><th>NF retorno</th><th>Previsão</th><th>Respondido em</th><th>Obs.</th><th>Rastreio (assistente)</th></tr></thead><tbody>`+
     l.map(n=>{const j=JUST[n.nf]||{},c=j.campos||{},s=situacao(n)||{}; return `<tr data-nf="${esc(n.nf)}"><td><b>${esc(n.nf)}</b></td><td>${nvHtml(n.vendedor)}</td><td>${esc(nomeSeg(n.cliente))}</td><td class="num">${brl(n.saldo)}</td>
-      <td>${tagResp(n)}</td><td>${esc(c.nf_retorno||c.nf_nova||'')}</td><td class="${s.alerta?'vermelho':''}">${esc(fmtData(c.previsao))}</td><td>${esc(j.quando||'')}</td><td class="mot">${esc(j.obs||'')}</td></tr>`}).join('')+`</tbody></table></div>`
+      <td>${tagResp(n)}</td><td>${esc(c.nf_retorno||c.nf_nova||'')}</td><td class="${s.alerta?'vermelho':''}">${esc(fmtData(c.previsao))}</td><td>${esc(j.quando||'')}</td><td class="mot">${esc(j.obs||'')}</td><td style="min-width:170px">${ctrlHtml(n.nf)}</td></tr>`}).join('')+`</tbody></table></div>`
     : '<div class="painel muted">Nenhuma.</div>';
   app.innerHTML=abasTopo()+`<div class="kpis">
     <div class="kpi"><div class="l">Mercadoria chegou – financeiro baixar</div><div class="v" style="color:var(--good-ink)">${chegou.length}</div><div class="s">${brl(soma(chegou,'saldo'))}</div></div>
@@ -920,7 +979,7 @@ function fsValor(v){
 function carregarJustFirebase(){
   const fb=D.fb||{}; if(!fb.projectId||!fb.apiKey) return false;
   fetch(`https://firestore.googleapis.com/v1/projects/${fb.projectId}/databases/(default)/documents/seguradoras/respostas?key=${fb.apiKey}`)
-    .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.fields) return; const m=fsValor(j.fields.m)||{}; JUST=m; render(); })
+    .then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.fields) return; const m=fsValor(j.fields.m)||{}; JUST=m; CTRL=fsValor(j.fields.c)||{}; render(); })
     .catch(()=>{});
   return true;
 }
@@ -936,7 +995,7 @@ function iniciar(){
   const vIni = window.VEND_INICIAL || decodeURIComponent(((location.hash||'').match(/v=([^&]+)/)||[])[1]||'');
   if (MODO_WEB){
     app.innerHTML='<div class="vazio-msg">Carregando…</div>';
-    BACK.carregar().then(o=>{ JUST=o.just||{}; VENDS=o.vendedores||[];
+    BACK.carregar().then(o=>{ JUST=o.just||{}; CTRL=o.controle||{}; VENDS=o.vendedores||[];
         if(!o.dados){ app.innerHTML='<div class="vazio-msg">Ainda não há dados. Rode o robô no computador do gestor.</div>'; return; }
         carregar(o.dados); if(vIni){ modoVend=vIni; render(); } })
       .catch(e=>{ app.innerHTML='<div class="vazio-msg">Erro ao carregar: '+esc(e.message||e)+'</div>'; });

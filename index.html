@@ -406,7 +406,7 @@ function detalhe(nf){
   const campo=(l,v)=>`<div class="campo"><div class="l">${l}</div><div class="v">${v}</div></div>`;
   let h=`<div class="alerta" style="--c:${st.c}"><b>${esc(NOME_SUB[n.categoria]||D.categorias[n.categoria])}</b>${n.confirmado?'':' <span class="muted">(ainda não confirmado no portal)</span>'}<ul style="margin:6px 0 0;padding-left:18px">${(n.motivos||[]).map(m=>`<li>${esc(m)}</li>`).join('')||'<li class="muted">Sem observações.</li>'}</ul></div>`;
   h+=`<div class="grid2">${campo('Seguradora',esc(n.cliente))}${campo('CNPJ',esc(n.cnpj))}${campo('Emissão / Venc.',esc(n.emissao)+' · '+esc(n.vencimento))}${campo('Atraso',(n.dias_atraso??'—')+' dias')}
-    ${campo('Valor NF',brl(n.valor))}${campo('Saldo',brl(n.saldo))}${campo('Peças desta NF no portal',n.valor_esperado==null?'—':brl(n.valor_esperado))}${campo('Devolvido no portal',n.valor_devolvido==null?'—':brl(n.valor_devolvido))}
+    ${campo('Valor NF',brl(n.valor))}${campo(n.dev_baixada?'A receber (dev. já baixada)':'Saldo',brl(n.saldo))}${campo('Peças desta NF no portal',n.valor_esperado==null?'—':brl(n.valor_esperado))}${campo('Devolvido no portal',n.valor_devolvido==null?'—':brl(n.valor_devolvido))}
     ${campo('Pedido',esc(n.pedido))}${campo('Sinistro',esc(n.sinistro))}${campo('Placa',esc(n.placa))}${campo('Vendedor',esc(n.vendedor))}</div>`;
   if (n.cilia){
     h+=`<h2>${esc(n.portal_nome||'Portal')}</h2><div class="grid2">${campo('Encontrado por',esc(c.busca||'—'))}${campo('Consultado em',esc((c.consultado_em||'').replace('T',' ')))}

@@ -255,7 +255,7 @@ const GRUPOS = [
   {id:'ok', nome:'OK – aguardando pagamento', i:'✓', c:'var(--good)', d:'Tudo certo no portal – cobrar a seguradora', cats:['ok_aguardando','pago_portal']},
   {id:'out', nome:'Sem informação do portal', i:'?', c:'var(--neutral)', d:'Não localizado ou ainda não consultado', cats:['nao_localizado','nao_consultado']},
 ];
-const NOME_SUB = {dev_pendente:'Não lançada no sistema (saldo integral)', dev_nf_cilia:'Lançada, falta NF de devolução no portal', dev_divergente:'Lançada com valor divergente',
+const NOME_SUB = {dev_pendente:'Devolução não lançada no sistema (saldo integral)', dev_nf_cilia:'Devolução lançada, falta NF de devolução no portal', dev_divergente:'Devolução lançada com valor divergente',
   nf_nao_anexada:'Nota não inserida no portal', valor_incorreto:'Nota emitida com valor incorreto', pag_recusado:'Pagamento não liberado / NF recusada', pago_portal:'Portal mostra PAGO – financeiro conferir', entrega_pendente:'Entrega não baixada (+30 dias)', entrega_prazo:'Em andamento – menos de 30 dias', ok_aguardando:'OK – aguardando pagamento',
   nao_localizado:'Não localizado no portal', nao_consultado:'Aguardando consulta do robô'};
 const GRUPO_ITEM = {
@@ -608,11 +608,24 @@ function respResumo(a){
 function textoResposta(x){
   const c=x.campos||{};
   if(!x.fluxo) return `${esc(x.status||'')} – ${esc(x.acao||'')}${x.nf_dev?' · NF '+esc(x.nf_dev):''}`;
-  return `<b>${x.resp==='sim'?'Sim':'Não'}</b>`+Object.entries(c).filter(([k,v])=>v).map(([k,v])=>' · '+esc(k==='chegou'?'mercadoria chegou':(k==='previsao'?'previsão '+fmtData(v):v))).join('');
+  const f=FLUXOS[x.fluxo]||{}, ramo=(x.resp==='sim'?f.sim:f.nao)||{};
+  const rot={chegou:'Mercadoria já chegou'};
+  (ramo.campos||[]).forEach(cp=>rot[cp[0]]=cp[1]);
+  if(ramo.chk) rot[ramo.chk[0]]=ramo.chk[1];
+  const ordem=[...(ramo.campos||[]).map(cp=>cp[0]), ...Object.keys(c).filter(k=>!(ramo.campos||[]).some(cp=>cp[0]===k))];
+  const det=ordem.filter(k=>c[k]).map(k=>{
+    const v=c[k], r=rot[k]||k;
+    if(v===true) return `<li>✔ ${esc(r)}</li>`;
+    return `<li>${esc(r.replace(/\?$/,''))}: <b>${esc(k==='previsao'?fmtData(v):v)}</b></li>`;
+  });
+  return `<div>${esc(f.pergunta||'Resposta')} <b>${x.resp==='sim'?'Sim':'Não'}</b></div>`
+    +(det.length||x.obs?`<ul style="margin:4px 0 0;padding-left:18px">${det.join('')}${x.obs?`<li>Obs.: ${esc(x.obs)}</li>`:''}</ul>`:'');
 }
 function blocoRespostaDrawer(n){
   const j=JUST[n.nf]; if(!j) return CRIT.includes(n.categoria)?`<h2>Resposta do vendedor</h2><div class="painel muted">Sem resposta do vendedor ainda.</div>`:'';
-  return `<h2>Resposta do vendedor</h2><div class="hist">`+(j.hist||[j]).slice().reverse().map(x=>`<div><b>${esc(x.quando)}</b> · ${esc(x.por||x.vendedor)} · ${textoResposta(x)}${x.obs?' · '+esc(x.obs):''}</div>`).join('')+`</div>`;
+  const st=situacaoReg(j);
+  return `<h2>Resposta do vendedor</h2>`+(st?`<div class="painel" style="border-left:4px solid ${st.cor};margin-bottom:8px"><b>Situação:</b> ${esc(st.txt)}${st.alerta?` <span style="color:var(--critical)">· ${esc(st.alerta)}</span>`:''}</div>`:'')
+    +`<div class="hist">`+(j.hist||[j]).slice().reverse().map(x=>`<div><span class="muted">${esc(x.quando)} · ${esc(x.por||x.vendedor)}</span>${textoResposta(x)}${!x.fluxo&&x.obs?' · '+esc(x.obs):''}</div>`).join('')+`</div>`;
 }
 function abrirVend(v){ modoVend=v; filtroResp='todos'; fechar(); render(); window.scrollTo(0,0); }
 function sairVend(){ modoVend=null; render(); }
